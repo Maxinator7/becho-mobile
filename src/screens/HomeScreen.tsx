@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, FlatList, Image, ActivityIndicator } from 'react-native';
 import { fetchApi } from '../api/client';
+import { formatPrice } from '../utils/format';
 import { LocationModal, ServiceArea } from '../components/LocationModal';
 import { CategoryPicker, CategoryNode } from '../components/CategoryPicker';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +20,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, logout } = useAuth();
   const [listings, setListings] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCity, setSelectedCity] = useState<string>('NYC');
+  const [selectedArea, setSelectedArea] = useState<ServiceArea | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('All Categories');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [modalVisible, setModalVisible] = useState<boolean>(false);
@@ -29,7 +30,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setLoading(true);
     let url = '/listings?limit=20';
     if (selectedCategoryId) url += `&categoryId=${selectedCategoryId}`;
-    if (selectedCity && selectedCity !== 'All Cities') url += `&cityCode=${selectedCity}`;
+    if (selectedArea) url += `&countryCode=${selectedArea.countryCode}&cityCode=${selectedArea.cityCode}`;
 
     const res = await fetchApi<{ listings: ListingItem[] }>(url);
     setLoading(false);
@@ -40,7 +41,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   useEffect(() => {
     loadListings();
-  }, [selectedCategoryId, selectedCity]);
+  }, [selectedCategoryId, selectedArea]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -72,7 +73,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       {/* Location & Category Pickers */}
       <View style={styles.filterRow}>
         <TouchableOpacity style={styles.filterBtn} onPress={() => setModalVisible(true)}>
-          <Text style={styles.filterBtnText}>📍 {selectedCity}</Text>
+          <Text style={styles.filterBtnText}>📍 {selectedArea?.cityName ?? 'All cities'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.filterBtn} onPress={() => setCategoryModalVisible(true)}>
@@ -106,7 +107,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 <View style={styles.cardBody}>
                   <Text style={styles.catText}>{item.category?.name || 'General'}</Text>
                   <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.itemPrice}>${item.price.toLocaleString()}</Text>
+                  <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -118,8 +119,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <LocationModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        selectedCity={selectedCity}
-        onSelectCity={(area: ServiceArea) => setSelectedCity(area.cityCode)}
+        selectedCity={selectedArea?.cityName ?? 'All cities'}
+        onSelectCity={setSelectedArea}
       />
 
       <CategoryPicker

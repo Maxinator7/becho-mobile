@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { fetchApi } from '../api/client';
+import { formatPrice } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
 
 interface ListingDetail {
@@ -20,6 +21,7 @@ interface ListingDetail {
 
 interface Offer {
   id: string;
+  proposedById?: string;
   amount: number;
   status: string;
   message?: string;
@@ -112,7 +114,7 @@ export const ProductDetailsScreen: React.FC<{ route: any; navigation: any }> = (
       setExistingOffer(res.data);
       setShowOfferModal(false);
       setOfferMessage('');
-      Alert.alert('Offer Sent! 🎉', `Your offer of $${amount.toLocaleString()} was sent to the seller.`);
+      Alert.alert('Offer Sent! 🎉', `Your offer of ${formatPrice(amount)} was sent to the seller.`);
     } else {
       Alert.alert('Error', res.error?.message || 'Failed to submit offer.');
     }
@@ -158,7 +160,7 @@ export const ProductDetailsScreen: React.FC<{ route: any; navigation: any }> = (
             <View style={styles.modalCard}>
               <Text style={styles.modalTitle}>💰 Make an Offer</Text>
               <Text style={styles.modalSub}>
-                Listed at <Text style={{ color: '#6366f1', fontWeight: '700' }}>${listing.price.toLocaleString()}</Text>
+                Listed at <Text style={{ color: '#6366f1', fontWeight: '700' }}>{formatPrice(listing.price)}</Text>
               </Text>
 
               <Text style={styles.inputLabel}>Your Offer Amount ($)</Text>
@@ -205,7 +207,7 @@ export const ProductDetailsScreen: React.FC<{ route: any; navigation: any }> = (
             <Text style={styles.conditionBadge}>{listing.condition}</Text>
           </View>
           <Text style={styles.title}>{listing.title}</Text>
-          <Text style={styles.price}>${listing.price.toLocaleString()}</Text>
+          <Text style={styles.price}>{formatPrice(listing.price)}</Text>
           <Text style={styles.location}>📍 {listing.cityCode}, {listing.stateCode} (Approximate)</Text>
         </View>
 
@@ -213,7 +215,7 @@ export const ProductDetailsScreen: React.FC<{ route: any; navigation: any }> = (
         {existingOffer && !isSeller && (
           <View style={[styles.sectionCard, { borderColor: STATUS_COLORS[existingOffer.status], borderWidth: 1 }]}>
             <Text style={[styles.sectionTitle, { color: STATUS_COLORS[existingOffer.status] }]}>
-              {STATUS_LABELS[existingOffer.status]} — Your Offer: ${existingOffer.amount.toLocaleString()}
+              {STATUS_LABELS[existingOffer.status]} — Your Offer: {formatPrice(existingOffer.amount)}
             </Text>
             {existingOffer.status === 'PENDING' && (
               <TouchableOpacity onPress={handleCancelOffer} style={{ marginTop: 8 }}>

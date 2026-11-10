@@ -17,15 +17,17 @@ export interface ServiceArea {
 export const LocationModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-  onSelectCity: (area: ServiceArea) => void;
+  onSelectCity: (area: ServiceArea | null) => void;
   selectedCity: string;
-}> = ({ visible, onClose, onSelectCity, selectedCity }) => {
+  /** Only cities where selling is enabled, and no "All cities" option. */
+  sellingOnly?: boolean;
+}> = ({ visible, onClose, onSelectCity, selectedCity, sellingOnly }) => {
   const [areas, setAreas] = useState<ServiceArea[]>([]);
 
   useEffect(() => {
     fetchApi<ServiceArea[]>('/locations/service-areas').then((res) => {
       if (res.success && res.data) {
-        setAreas(res.data);
+        setAreas(sellingOnly ? res.data.filter((a) => a.sellingEnabled) : res.data);
       }
     });
   }, []);
@@ -34,7 +36,12 @@ export const LocationModal: React.FC<{
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.title}>Select Service Area</Text>
+          <Text style={styles.title}>Choose your city</Text>
+          {!sellingOnly && (
+            <TouchableOpacity style={[styles.cityItem, selectedCity === 'All cities' && styles.selectedItem]} onPress={() => { onSelectCity(null); onClose(); }}>
+              <Text style={styles.cityName}>All cities</Text>
+            </TouchableOpacity>
+          )}
           <FlatList
             data={areas}
             keyExtractor={(item) => item.id}
@@ -46,7 +53,7 @@ export const LocationModal: React.FC<{
                   onClose();
                 }}
               >
-                <Text style={styles.cityName}>{item.cityName}, {item.stateCode}</Text>
+                <Text style={styles.cityName}>{item.cityName}, {item.stateName}</Text>
                 <Text style={styles.statusText}>
                   {item.buyingEnabled && item.sellingEnabled ? 'Active' : 'Restricted'}
                 </Text>

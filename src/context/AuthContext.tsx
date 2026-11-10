@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
-import { setAuthToken, fetchApi } from '../api/client';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { AuthTokens, fetchApi, session } from '../api/client';
 
 export interface UserProfile {
   id: string;
@@ -12,36 +12,57 @@ export interface UserProfile {
 
 interface AuthContextType {
   user: UserProfile | null;
-  token: string | null;
-  login: (token: string, refreshToken: string, user: UserProfile) => void;
-  logout: () => void;
+  isLoading: boolean;
+  isVerified: boolean;
+  login: (tokens: AuthTokens, user: UserProfile) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  token: null,
-  login: () => {},
-  logout: () => {},
+  isLoading: true,
+  isVerified: false,
+  login: async () => {},
+  logout: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = (accessToken: string, _refreshToken: string, userProfile: UserProfile) => {
-    setAuthToken(accessToken);
-    setToken(accessToken);
-    setUser(userProfile);
-  };
+  // Restore the persisted session on app launch.
+  useEffect(() => {
+    session.onExpired(() => setUser(null));
+    (async () => {
+      try {
+        if (await session.restore()) {
+          const res = await fetchApi<UserProfile>('/users/me');
+          if (res.success && res.data) setUser(res.data);
+          else if (res.error?.code !== 'NETWORK_ERROR') await session.clear();
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    return () => session.onExpired(null);
+  }, []);
 
-  const logout = () => {
-    setAuthToken(null);
-    setToken(null);
+  const login = useCallback(async (tokens: AuthTokens, profile: UserProfile) => {
+    await session.save(tokens);
+    setUser(profile);
+  }, []);
+
+  const logout = useCallback(async () => {
+    const refreshToken = session.refreshToken;
+    if (refreshToken) {
+      fetchApi('/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) }).catch(() => {});
+    }
+    await session.clear();
     setUser(null);
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isVerified: user?.status === 'ACTIVE', login, logout }}>
       {children}
     </AuthContext.Provider>
   );

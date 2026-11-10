@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
-import { fetchApi } from '../api/client';
+import { fetchApi, AuthTokens } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -27,7 +27,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       password,
     };
 
-    const res = await fetchApi<{ tokens: { accessToken: string; refreshToken: string }; user: any; verificationMessage: string }>('/auth/register', {
+    const res = await fetchApi<{ tokens: AuthTokens; user: any; verificationMessage: string; devOtp?: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(body),
     });
@@ -35,8 +35,8 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     setLoading(false);
     if (res.success && res.data) {
       setRegisteredUserId(res.data.user.id);
-      setInfo(res.data.verificationMessage);
-      login(res.data.tokens.accessToken, res.data.tokens.refreshToken, res.data.user);
+      setInfo(res.data.devOtp ? `${res.data.verificationMessage} (dev code: ${res.data.devOtp})` : res.data.verificationMessage);
+      await login(res.data.tokens, res.data.user);
     } else {
       setError(res.error?.message || 'Registration failed');
     }
@@ -46,18 +46,14 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     setError(null);
     setLoading(true);
 
-    const isEmail = emailOrPhone.includes('@');
-    const res = await fetchApi('/auth/verify-otp', {
+    const res = await fetchApi<{ tokens: AuthTokens; user: any }>('/auth/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({
-        userId: registeredUserId,
-        channel: isEmail ? 'EMAIL' : 'PHONE',
-        code: otpCode,
-      }),
+      body: JSON.stringify({ code: otpCode.trim() }),
     });
 
     setLoading(false);
-    if (res.success) {
+    if (res.success && res.data) {
+      await login(res.data.tokens, res.data.user);
       navigation.navigate('Home');
     } else {
       setError(res.error?.message || 'Verification failed');
@@ -76,7 +72,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             <Text style={styles.label}>Display Name</Text>
             <TextInput
               style={styles.input}
-              placeholder="Jane Doe"
+              placeholder="Your name"
               placeholderTextColor="#6b7280"
               value={displayName}
               onChangeText={setDisplayName}
@@ -85,7 +81,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             <Text style={styles.label}>Email or Phone</Text>
             <TextInput
               style={styles.input}
-              placeholder="user@example.com"
+              placeholder="98765 43210 or you@example.com"
               placeholderTextColor="#6b7280"
               value={emailOrPhone}
               onChangeText={setEmailOrPhone}

@@ -28,7 +28,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
     setLoading(false);
     if (res.success && res.data) {
-      login(res.data.tokens.accessToken, res.data.tokens.refreshToken, res.data.user);
+      await login(res.data.tokens, res.data.user);
       navigation.navigate('Home');
     } else {
       setError(res.error?.message || 'Login failed');

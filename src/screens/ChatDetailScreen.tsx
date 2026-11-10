@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal } from 'react-native';
 import { fetchApi } from '../api/client';
+import { formatPrice } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
 
 interface MessageItem {
@@ -23,12 +24,14 @@ interface Offer {
   listingId: string;
   buyerId: string;
   sellerId: string;
+  proposedById: string;
   amount: number;
   status: string;
   message?: string;
   createdAt: string;
   buyer: { id: string; displayName: string };
   seller: { id: string; displayName: string };
+  proposedBy: { id: string; displayName: string };
   listing: { id: string; title: string; price: number };
   parentOffer?: { id: string; amount: number; status: string } | null;
 }
@@ -80,15 +83,12 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   // Load offers for the conversation's listing
   const loadOffers = async () => {
     if (!meta || !user) return;
-    const isSeller = meta.seller.id === user.id;
-    const endpoint = isSeller
-      ? `/offers/listing/${meta.listingId}`
-      : `/offers/chain?listingId=${meta.listingId}&buyerId=${meta.buyer.id}`;
-    const res = await fetchApi<Offer[]>(endpoint);
-    if (res.success && res.data) setOffers(res.data);
+    const res = await fetchApi<Offer[]>(`/offers/chain?listingId=${meta.listingId}&buyerId=${meta.buyer.id}`);
+    if (res.success && res.data) setOffers([...res.data].reverse());
   };
 
-  useEffect(() => { loadOffers(); }, [meta, user]);
+  // Only reload when the negotiation thread changes, not on every message poll.
+  useEffect(() => { loadOffers(); }, [meta?.listingId, meta?.buyer.id, user]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -111,9 +111,8 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
           setActingOnOffer(offerId);
           const res = await fetchApi<Offer>(`/offers/${offerId}/${action}`, { method: 'POST' });
           setActingOnOffer(null);
-          if (res.success && res.data) {
-            setOffers((prev) => prev.map((o) => (o.id === offerId ? res.data! : o)));
-          }
+          if (res.success) loadOffers();
+          else Alert.alert('Could not update offer', res.error?.message || 'Please try again.');
         },
       },
     ]);
@@ -141,7 +140,7 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
       setOffers((prev) => [res.data!, ...prev.map((o) => o.id === counterTargetOffer.id ? { ...o, status: 'COUNTERED' } : o)]);
       setShowCounterModal(false);
       setCounterTargetOffer(null);
-      Alert.alert('Counter Sent! 🔄', `Your counter offer of $${amount.toLocaleString()} was sent.`);
+      Alert.alert('Counter Sent! 🔄', `Your counter offer of ${formatPrice(amount)} was sent.`);
     } else {
       Alert.alert('Error', res.error?.message || 'Failed to send counter offer.');
     }
@@ -172,23 +171,23 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
               keyExtractor={(o) => o.id}
               style={{ maxHeight: 400 }}
               renderItem={({ item: offer }) => {
-                const iAmSeller = offer.sellerId === user?.id;
-                const iAmBuyer = offer.buyerId === user?.id;
-                const canAct = iAmSeller && offer.status === 'PENDING';
-                const canCancel = iAmBuyer && offer.status === 'PENDING';
+                // The proposer can withdraw; only the other party can accept, counter or reject.
+                const isMine = offer.proposedById === user?.id;
+                const canAct = !isMine && offer.status === 'PENDING';
+                const canCancel = isMine && offer.status === 'PENDING';
                 return (
                   <View style={[styles.offerCard, { borderColor: STATUS_COLORS[offer.status] }]}>
                     <View style={styles.offerCardRow}>
                       <Text style={[styles.offerAmount, { color: STATUS_COLORS[offer.status] }]}>
-                        ${offer.amount.toLocaleString()}
+                        {formatPrice(offer.amount)}
                       </Text>
                       <Text style={[styles.offerStatus, { backgroundColor: `${STATUS_COLORS[offer.status]}22`, color: STATUS_COLORS[offer.status] }]}>
                         {offer.status}
                       </Text>
                     </View>
-                    <Text style={styles.offerMeta}>From {offer.buyer.displayName} · {new Date(offer.createdAt).toLocaleDateString()}</Text>
+                    <Text style={styles.offerMeta}>From {isMine ? 'you' : offer.proposedBy.displayName} · {new Date(offer.createdAt).toLocaleDateString()}</Text>
                     {offer.message ? <Text style={styles.offerMsg}>"{offer.message}"</Text> : null}
-                    {offer.parentOffer ? <Text style={styles.offerReply}>↩ Reply to ${offer.parentOffer.amount.toLocaleString()}</Text> : null}
+                    {offer.parentOffer ? <Text style={styles.offerReply}>↩ Reply to {formatPrice(offer.parentOffer.amount)}</Text> : null}
                     {(canAct || canCancel) && (
                       <View style={styles.offerActions}>
                         {canAct && (
@@ -232,7 +231,7 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
                 </TouchableOpacity>
               </View>
               {counterTargetOffer && (
-                <Text style={styles.modalSub}>Their offer: <Text style={{ color: '#f59e0b', fontWeight: '700' }}>${counterTargetOffer.amount.toLocaleString()}</Text></Text>
+                <Text style={styles.modalSub}>Their offer: <Text style={{ color: '#f59e0b', fontWeight: '700' }}>{formatPrice(counterTargetOffer.amount)}</Text></Text>
               )}
               <Text style={styles.inputLabel}>Your Counter Amount ($)</Text>
               <TextInput
@@ -270,7 +269,7 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
             <View style={styles.headerContent}>
               <View>
                 <Text style={styles.headerTitle} numberOfLines={1}>{meta.listing.title}</Text>
-                <Text style={styles.headerSub}>${meta.listing.price.toLocaleString()}</Text>
+                <Text style={styles.headerSub}>{formatPrice(meta.listing.price)}</Text>
               </View>
               {/* Offers badge */}
               <TouchableOpacity

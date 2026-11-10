@@ -29,3 +29,13 @@ App.tsx             # Root Expo component
    npm run android
    npm run ios
    ```
+
+## API URL
+
+Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL`:
+
+- Android emulator: `http://10.0.2.2:4000/api/v1` (default)
+- iOS simulator: `http://localhost:4000/api/v1`
+- Physical device: `http://<your-computer-LAN-IP>:4000/api/v1`
+
+Sessions are stored with `expo-secure-store` and refreshed automatically.
