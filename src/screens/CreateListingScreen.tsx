@@ -5,6 +5,9 @@ import { fetchApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { CategoryPicker, CategoryNode } from '../components/CategoryPicker';
 import { LocationModal, ServiceArea } from '../components/LocationModal';
+import { MediaItem, MediaPicker } from '../components/MediaPicker';
+import { DEFAULT_LIMITS, MediaLimits, getMediaLimits } from '../utils/media';
+import { Colors, useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 interface AttributeDefinition {
   id: string;
@@ -23,11 +26,14 @@ const CONDITIONS = [
 
 export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, isVerified } = useAuth();
+  const { colors } = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [condition, setCondition] = useState('USED');
-  const [imageUrl, setImageUrl] = useState('');
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [limits, setLimits] = useState<MediaLimits>(DEFAULT_LIMITS);
   const [category, setCategory] = useState<CategoryNode | null>(null);
   const [area, setArea] = useState<ServiceArea | null>(null);
   const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
@@ -42,6 +48,10 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
   }, [user, navigation]);
 
   useEffect(() => {
+    getMediaLimits().then(setLimits);
+  }, []);
+
+  useEffect(() => {
     setAttributes([]);
     setAttributeValues({});
     if (!category) return;
@@ -49,6 +59,8 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
       if (res.success && res.data) setAttributes(res.data);
     });
   }, [category]);
+
+  const uploading = media.some((m) => m.status === 'uploading');
 
   const handleSubmit = async () => {
     if (!isVerified) {
@@ -62,6 +74,14 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
     const missing = attributes.filter((a) => a.isRequired && !attributeValues[a.id]);
     if (missing.length > 0) {
       setError(`Please fill in: ${missing.map((a) => a.name).join(', ')}`);
+      return;
+    }
+    if (uploading) {
+      setError('Please wait for your photos and video to finish uploading.');
+      return;
+    }
+    if (!media.some((m) => m.kind === 'IMAGE' && m.status === 'done')) {
+      setError('Add at least one photo — listings with photos get far more replies.');
       return;
     }
 
@@ -84,7 +104,10 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
             ? { attributeDefinitionId: a.id, valueNumber: Number(attributeValues[a.id]) }
             : { attributeDefinitionId: a.id, valueText: attributeValues[a.id] }
         ),
-      media: imageUrl ? [{ url: imageUrl.trim() }] : [],
+      // Photos first (the first is the cover), then the video.
+      media: [...media.filter((m) => m.kind === 'IMAGE'), ...media.filter((m) => m.kind === 'VIDEO')]
+        .filter((m) => m.status === 'done' && m.uploadId)
+        .map((m) => ({ uploadId: m.uploadId! })),
     };
 
     const created = await fetchApi<{ id: string }>('/listings', { method: 'POST', body: JSON.stringify(body) });
@@ -113,6 +136,9 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
         <Text style={styles.title}>Sell an item</Text>
         {error && <Text style={styles.errorText}>{error}</Text>}
 
+        <Text style={styles.label}>Photos and video *</Text>
+        <MediaPicker items={media} onChange={setMedia} limits={limits} />
+
         <Text style={styles.label}>Category</Text>
         <TouchableOpacity style={styles.input} onPress={() => setCategoryPickerVisible(true)}>
           <Text style={category ? styles.valueText : styles.placeholderText}>{category ? category.name : 'Choose a category'}</Text>
@@ -124,16 +150,16 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
         </TouchableOpacity>
 
         <Text style={styles.label}>Title</Text>
-        <TextInput style={styles.input} placeholder="e.g. iPhone 14 128GB" placeholderTextColor="#6b7280" value={title} onChangeText={setTitle} />
+        <TextInput style={styles.input} placeholder="e.g. iPhone 14 128GB" placeholderTextColor={colors.placeholder} value={title} onChangeText={setTitle} />
 
         <Text style={styles.label}>Price (₹)</Text>
-        <TextInput style={styles.input} placeholder="25000" placeholderTextColor="#6b7280" keyboardType="numeric" value={price} onChangeText={(t) => setPrice(t.replace(/[^\d]/g, ''))} />
+        <TextInput style={styles.input} placeholder="25000" placeholderTextColor={colors.placeholder} keyboardType="numeric" value={price} onChangeText={(t) => setPrice(t.replace(/[^\d]/g, ''))} />
 
         <Text style={styles.label}>Condition</Text>
         <View style={styles.chipRow}>
           {CONDITIONS.map((c) => (
             <TouchableOpacity key={c.value} style={[styles.chip, condition === c.value && styles.chipActive]} onPress={() => setCondition(c.value)}>
-              <Text style={styles.chipText}>{c.label}</Text>
+              <Text style={[styles.chipText, condition === c.value && styles.chipTextActive]}>{c.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -143,20 +169,23 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
             <Text style={styles.label}>{attr.name}{attr.isRequired ? ' *' : ''}</Text>
             {attr.options.length > 0 ? (
               <View style={styles.chipRow}>
-                {attr.options.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.id}
-                    style={[styles.chip, attributeValues[attr.id] === opt.value && styles.chipActive]}
-                    onPress={() => setAttributeValues({ ...attributeValues, [attr.id]: opt.value })}
-                  >
-                    <Text style={styles.chipText}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
+                {attr.options.map((opt) => {
+                  const active = attributeValues[attr.id] === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setAttributeValues({ ...attributeValues, [attr.id]: opt.value })}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             ) : (
               <TextInput
                 style={styles.input}
-                placeholderTextColor="#6b7280"
+                placeholderTextColor={colors.placeholder}
                 keyboardType={attr.dataType === 'NUMBER' ? 'numeric' : 'default'}
                 value={attributeValues[attr.id] || ''}
                 onChangeText={(t) => setAttributeValues({ ...attributeValues, [attr.id]: t })}
@@ -169,17 +198,16 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
         <TextInput
           style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
           placeholder="Describe your item..."
-          placeholderTextColor="#6b7280"
+          placeholderTextColor={colors.placeholder}
           multiline
           value={description}
           onChangeText={setDescription}
         />
 
-        <Text style={styles.label}>Image URL (optional)</Text>
-        <TextInput style={styles.input} placeholder="https://..." placeholderTextColor="#6b7280" autoCapitalize="none" value={imageUrl} onChangeText={setImageUrl} />
+        <Text style={styles.hint}>You can post up to {limits.listingsPerDay} listings a day.</Text>
 
-        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Publish Listing</Text>}
+        <TouchableOpacity style={[styles.button, (loading || uploading) && { opacity: 0.7 }]} onPress={handleSubmit} disabled={loading || uploading}>
+          {loading ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>{uploading ? 'Uploading media…' : 'Publish Listing'}</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
@@ -199,21 +227,24 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090d16' },
-  scroll: { padding: 24 },
-  title: { fontSize: 28, fontWeight: '800', color: '#f9fafb', marginBottom: 20, textAlign: 'center' },
-  label: { color: '#9ca3af', fontSize: 14, marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#1f2937', color: '#fff', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#374151' },
-  valueText: { color: '#fff' },
-  placeholderText: { color: '#6b7280' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#1f2937', borderWidth: 1, borderColor: '#374151' },
-  chipActive: { backgroundColor: '#4f46e5', borderColor: '#6366f1' },
-  chipText: { color: '#f9fafb', fontSize: 13 },
-  button: { backgroundColor: '#6366f1', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-  cancelBtn: { marginTop: 12, alignItems: 'center' },
-  cancelText: { color: '#9ca3af', fontSize: 15 },
-  errorText: { color: '#ef4444', textAlign: 'center', marginBottom: 12 },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    scroll: { padding: 24 },
+    title: { fontSize: 28, fontWeight: '800', color: c.text, marginBottom: 20, textAlign: 'center' },
+    label: { color: c.textSecondary, fontSize: 14, marginBottom: 6, marginTop: 14 },
+    input: { backgroundColor: c.inputBg, color: c.text, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: c.inputBorder },
+    valueText: { color: c.text },
+    placeholderText: { color: c.placeholder },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, backgroundColor: c.surface2, borderWidth: 1, borderColor: c.inputBorder },
+    chipActive: { backgroundColor: c.primary, borderColor: c.primary },
+    chipText: { color: c.text, fontSize: 13 },
+    chipTextActive: { color: c.onPrimary },
+    hint: { color: c.textMuted, fontSize: 12, marginTop: 14 },
+    button: { backgroundColor: c.primary, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 16 },
+    buttonText: { color: c.onPrimary, fontWeight: '600', fontSize: 16 },
+    cancelBtn: { marginTop: 12, alignItems: 'center' },
+    cancelText: { color: c.textSecondary, fontSize: 15 },
+    errorText: { color: c.danger, textAlign: 'center', marginBottom: 12 },
+  });

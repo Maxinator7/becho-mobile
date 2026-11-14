@@ -48,3 +48,17 @@ Sessions are stored with `expo-secure-store` and refreshed automatically.
 ## Run against the staging API
 
 Put `EXPO_PUBLIC_API_URL=https://becho-api.onrender.com/api/v1` in `.env`, then `npx expo start` and scan the QR code with Expo Go.
+
+## Photos, videos, notifications and themes
+
+- **Selling:** pick photos from the gallery or camera, plus one video. Photos are resized on the phone (max 1600px, JPEG) and every file uploads straight to storage with a progress bar. Limits come from the API (`GET /media/limits`).
+- **Notifications:** 🔔 on the home screen shows unread messages and offers, checked every 20s while the app is open. Tapping one opens the right chat or listing. Push notifications need an EAS development build (Expo Go can't receive them on Android) and are planned for later.
+- **Chat:** offers, counters, accepts and sales appear inline. When a deal is agreed the seller can mark the item as sold or cancel the reservation.
+- **Theme:** ◐ / ☀︎ / ☾ in the home header switches between automatic, light and dark.
+
+### Testing uploads against a local API on your phone
+
+The phone can't reach `localhost`, so use your Mac's LAN IP (e.g. `192.168.1.20`):
+
+- Mobile `.env`: `EXPO_PUBLIC_API_URL=http://192.168.1.20:4000/api/v1`
+- API `.env`: `PUBLIC_API_URL=http://192.168.1.20:4000` (upload links point here when `STORAGE_DRIVER=local`)

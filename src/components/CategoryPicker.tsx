@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, Modal, TouchableOpacity, FlatList } from 'react-native';
 import { fetchApi } from '../api/client';
+import { Colors, useThemedStyles } from '../theme/ThemeContext';
 
 export interface CategoryNode {
   id: string;
@@ -15,6 +16,7 @@ export const CategoryPicker: React.FC<{
   onSelectCategory: (cat: CategoryNode) => void;
 }> = ({ visible, onClose, onSelectCategory }) => {
   const [categories, setCategories] = useState<CategoryNode[]>([]);
+  const styles = useThemedStyles(makeStyles);
 
   useEffect(() => {
     fetchApi<CategoryNode[]>('/categories').then((res) => {
@@ -59,14 +61,14 @@ export const CategoryPicker: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#111827', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '70%' },
-  title: { fontSize: 20, fontWeight: '700', color: '#f9fafb', marginBottom: 16 },
+const makeStyles = (c: Colors) => StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: c.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, maxHeight: '70%' },
+  title: { fontSize: 20, fontWeight: '700', color: c.text, marginBottom: 16 },
   parentSection: { marginBottom: 16 },
-  parentTitle: { color: '#6366f1', fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  childItem: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 6, backgroundColor: '#1f2937', marginBottom: 6 },
-  childName: { color: '#f9fafb', fontSize: 14 },
+  parentTitle: { color: c.primary, fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  childItem: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 6, backgroundColor: c.surface2, marginBottom: 6 },
+  childName: { color: c.text, fontSize: 14 },
   closeButton: { marginTop: 12, padding: 12, alignItems: 'center' },
-  closeText: { color: '#9ca3af', fontSize: 16 },
+  closeText: { color: c.textSecondary, fontSize: 16 },
 });

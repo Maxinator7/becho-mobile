@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi, AuthTokens } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { Colors, useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [displayName, setDisplayName] = useState('');
@@ -15,6 +16,8 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
 
   const handleRegister = async () => {
     setError(null);
@@ -74,7 +77,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             <TextInput
               style={styles.input}
               placeholder="Your name"
-              placeholderTextColor="#6b7280"
+              placeholderTextColor={colors.placeholder}
               value={displayName}
               onChangeText={setDisplayName}
             />
@@ -83,7 +86,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             <TextInput
               style={styles.input}
               placeholder="98765 43210 or you@example.com"
-              placeholderTextColor="#6b7280"
+              placeholderTextColor={colors.placeholder}
               value={emailOrPhone}
               onChangeText={setEmailOrPhone}
               autoCapitalize="none"
@@ -93,14 +96,14 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             <TextInput
               style={styles.input}
               placeholder="••••••••"
-              placeholderTextColor="#6b7280"
+              placeholderTextColor={colors.placeholder}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
             />
 
             <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Register</Text>}
+              {loading ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Register</Text>}
             </TouchableOpacity>
           </>
         ) : (
@@ -109,7 +112,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             <TextInput
               style={[styles.input, { textAlign: 'center', fontSize: 20, letterSpacing: 4 }]}
               placeholder="123456"
-              placeholderTextColor="#6b7280"
+              placeholderTextColor={colors.placeholder}
               maxLength={6}
               value={otpCode}
               onChangeText={setOtpCode}
@@ -117,7 +120,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             />
 
             <TouchableOpacity style={styles.button} onPress={handleVerifyOtp} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Verify OTP</Text>}
+              {loading ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Verify OTP</Text>}
             </TouchableOpacity>
           </>
         )}
@@ -130,16 +133,16 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090d16', justifyContent: 'center', padding: 20 },
-  card: { backgroundColor: '#111827', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#1f2937' },
-  title: { fontSize: 24, fontWeight: '700', color: '#f9fafb', marginBottom: 20, textAlign: 'center' },
-  label: { color: '#9ca3af', fontSize: 14, marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#1f2937', color: '#fff', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#374151' },
-  button: { backgroundColor: '#6366f1', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-  errorText: { color: '#ef4444', textAlign: 'center', marginBottom: 12 },
-  infoText: { color: '#10b981', textAlign: 'center', marginBottom: 12, fontSize: 13 },
+const makeStyles = (c: Colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg, justifyContent: 'center', padding: 20 },
+  card: { backgroundColor: c.surface, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: c.border },
+  title: { fontSize: 24, fontWeight: '700', color: c.text, marginBottom: 20, textAlign: 'center' },
+  label: { color: c.textSecondary, fontSize: 14, marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: c.inputBg, color: c.text, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: c.inputBorder },
+  button: { backgroundColor: c.primary, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
+  buttonText: { color: c.onPrimary, fontWeight: '600', fontSize: 16 },
+  errorText: { color: c.danger, textAlign: 'center', marginBottom: 12 },
+  infoText: { color: c.success, textAlign: 'center', marginBottom: 12, fontSize: 13 },
   linkButton: { marginTop: 16, alignItems: 'center' },
-  linkText: { color: '#818cf8', fontSize: 14 },
+  linkText: { color: c.primary, fontSize: 14 },
 });

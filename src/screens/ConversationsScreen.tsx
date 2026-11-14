@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image, ActivityIndi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { Colors, useTheme, useThemedStyles } from '../theme/ThemeContext';
 
 interface ConversationItem {
   id: string;
@@ -21,6 +22,8 @@ interface ConversationItem {
 
 export const ConversationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
+  const styles = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,7 +45,7 @@ export const ConversationsScreen: React.FC<{ navigation: any }> = ({ navigation 
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -95,19 +98,19 @@ export const ConversationsScreen: React.FC<{ navigation: any }> = ({ navigation 
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090d16' },
-  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+const makeStyles = (c: Colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg },
+  header: { padding: 16, borderBottomWidth: 1, borderBottomColor: c.border },
   backBtn: { marginBottom: 8 },
-  backBtnText: { color: '#818cf8', fontSize: 16 },
-  title: { fontSize: 22, fontWeight: '800', color: '#fff' },
+  backBtnText: { color: c.primary, fontSize: 16 },
+  title: { fontSize: 22, fontWeight: '800', color: c.text },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: '#9ca3af', fontSize: 15 },
-  card: { flexDirection: 'row', backgroundColor: '#131b2e', padding: 12, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
-  thumb: { width: 50, height: 50, borderRadius: 8, marginRight: 12, backgroundColor: '#1e293b' },
-  placeholderThumb: { backgroundColor: '#374151' },
+  emptyText: { color: c.textSecondary, fontSize: 15 },
+  card: { flexDirection: 'row', backgroundColor: c.surface, padding: 12, borderRadius: 12, marginBottom: 12, alignItems: 'center' },
+  thumb: { width: 50, height: 50, borderRadius: 8, marginRight: 12, backgroundColor: c.surface2 },
+  placeholderThumb: { backgroundColor: c.borderStrong },
   cardContent: { flex: 1 },
-  listingTitle: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 2 },
-  userName: { color: '#38bdf8', fontSize: 13, fontWeight: '600', marginBottom: 2 },
-  lastMsg: { color: '#9ca3af', fontSize: 13 },
+  listingTitle: { color: c.text, fontWeight: '700', fontSize: 15, marginBottom: 2 },
+  userName: { color: c.primary, fontSize: 13, fontWeight: '600', marginBottom: 2 },
+  lastMsg: { color: c.textSecondary, fontSize: 13 },
 });

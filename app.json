@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Becho",
+    "slug": "becho-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Becho uses your photo library so you can add photos and videos to your listings.",
+        "NSCameraUsageDescription": "Becho uses the camera so you can take photos of items you sell."
+      }
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
+    },
+    "plugins": [
+      "expo-video"
+    ]
+  }
+}

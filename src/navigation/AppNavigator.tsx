@@ -1,5 +1,6 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
+import { useTheme } from '../theme/ThemeContext';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeScreen } from '../screens/HomeScreen';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -8,6 +9,7 @@ import { CreateListingScreen } from '../screens/CreateListingScreen';
 import { ProductDetailsScreen } from '../screens/ProductDetailsScreen';
 import { ConversationsScreen } from '../screens/ConversationsScreen';
 import { ChatDetailScreen } from '../screens/ChatDetailScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -17,13 +19,17 @@ export type RootStackParamList = {
   ProductDetails: { listingId: string };
   Conversations: undefined;
   ChatDetail: { conversationId: string };
+  Notifications: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const AppNavigator: React.FC = () => {
+  const { colors, scheme } = useTheme();
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navTheme = { ...base, colors: { ...base.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.primary } };
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
@@ -32,6 +38,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
         <Stack.Screen name="Conversations" component={ConversationsScreen} />
         <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

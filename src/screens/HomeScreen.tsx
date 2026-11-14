@@ -6,6 +6,10 @@ import { formatPrice } from '../utils/format';
 import { LocationModal, ServiceArea } from '../components/LocationModal';
 import { CategoryPicker, CategoryNode } from '../components/CategoryPicker';
 import { useAuth } from '../context/AuthContext';
+import { NotificationBell } from '../components/NotificationBell';
+import { Colors, ThemePreference, useTheme, useThemedStyles } from '../theme/ThemeContext';
+
+const THEME_LABEL: Record<ThemePreference, string> = { system: '◐', light: '☀︎', dark: '☾' };
 
 interface ListingItem {
   id: string;
@@ -19,6 +23,8 @@ interface ListingItem {
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const styles = useThemedStyles(makeStyles);
+  const { colors, preference, cyclePreference } = useTheme();
   const [listings, setListings] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedArea, setSelectedArea] = useState<ServiceArea | null>(null);
@@ -54,12 +60,21 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </View>
 
         <View style={styles.userControls}>
+          <TouchableOpacity
+            style={styles.themeBtn}
+            onPress={cyclePreference}
+            accessibilityRole="button"
+            accessibilityLabel={`Theme: ${preference === 'system' ? 'automatic' : preference}. Tap to change.`}
+          >
+            <Text style={styles.themeBtnText}>{THEME_LABEL[preference]}</Text>
+          </TouchableOpacity>
           {user ? (
             <>
-              <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Conversations')}>
+              <NotificationBell onPress={() => navigation.navigate('Notifications')} />
+              <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Conversations')} accessibilityLabel="Messages">
                 <Text style={styles.iconBtnText}>💬</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('CreateListing')}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('CreateListing')} accessibilityLabel="Sell an item">
                 <Text style={styles.iconBtnText}>➕</Text>
               </TouchableOpacity>
             </>
@@ -85,7 +100,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       {/* Main Listings Grid / List */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : listings.length === 0 ? (
         <View style={styles.center}>
@@ -136,25 +151,27 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090d16' },
+const makeStyles = (c: Colors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
-  title: { fontSize: 24, fontWeight: '800', color: '#6366f1' },
-  subtitle: { fontSize: 12, fontWeight: '600', color: '#9ca3af' },
+  title: { fontSize: 24, fontWeight: '800', color: c.primary },
+  subtitle: { fontSize: 12, fontWeight: '600', color: c.textSecondary },
   userControls: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  iconBtn: { backgroundColor: 'rgba(255,255,255,0.08)', padding: 10, borderRadius: 20 },
+  iconBtn: { backgroundColor: c.border, padding: 10, borderRadius: 20 },
   iconBtnText: { fontSize: 16 },
-  loginBtn: { backgroundColor: '#6366f1', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  loginBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  themeBtn: { backgroundColor: c.border, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 20 },
+  themeBtnText: { color: c.text, fontSize: 13, fontWeight: '600' },
+  loginBtn: { backgroundColor: c.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  loginBtnText: { color: c.onPrimary, fontWeight: '700', fontSize: 13 },
   filterRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 10 },
-  filterBtn: { flex: 1, backgroundColor: '#131b2e', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  filterBtnText: { color: '#818cf8', fontWeight: '600', fontSize: 13 },
+  filterBtn: { flex: 1, backgroundColor: c.surface, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: c.border },
+  filterBtnText: { color: c.primary, fontWeight: '600', fontSize: 13 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: '#9ca3af', fontSize: 14 },
-  card: { flex: 0.5, margin: 6, backgroundColor: '#131b2e', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  cardImage: { width: '100%', height: 130, backgroundColor: '#1e293b' },
+  emptyText: { color: c.textSecondary, fontSize: 14 },
+  card: { flex: 0.5, margin: 6, backgroundColor: c.surface, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: c.border },
+  cardImage: { width: '100%', height: 130, backgroundColor: c.surface2 },
   cardBody: { padding: 10 },
-  catText: { color: '#818cf8', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 },
-  itemTitle: { color: '#fff', fontWeight: '700', fontSize: 14, marginBottom: 4 },
-  itemPrice: { color: '#6366f1', fontWeight: '800', fontSize: 16 },
+  catText: { color: c.primary, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', marginBottom: 2 },
+  itemTitle: { color: c.text, fontWeight: '700', fontSize: 14, marginBottom: 4 },
+  itemPrice: { color: c.primary, fontWeight: '800', fontSize: 16 },
 });
