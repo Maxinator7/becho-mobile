@@ -1,6 +1,8 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    // TypeScript 6 no longer includes @types/* automatically; needed for process.env.EXPO_PUBLIC_*.
+    "types": ["node"]
   }
 }

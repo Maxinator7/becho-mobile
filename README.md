@@ -39,3 +39,12 @@ Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL`:
 - Physical device: `http://<your-computer-LAN-IP>:4000/api/v1`
 
 Sessions are stored with `expo-secure-store` and refreshed automatically.
+
+## Requirements
+
+- Expo SDK 58 (use the current Expo Go from the App Store / Play Store).
+- Node.js 22.13+ (Node 24 recommended; `.nvmrc` is provided, run `nvm use`).
+
+## Run against the staging API
+
+Put `EXPO_PUBLIC_API_URL=https://becho-api.onrender.com/api/v1` in `.env`, then `npx expo start` and scan the QR code with Expo Go.

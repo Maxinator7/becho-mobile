@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -29,7 +30,7 @@ export const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     setLoading(false);
     if (res.success && res.data) {
       await login(res.data.tokens, res.data.user);
-      navigation.navigate('Home');
+      navigation.popTo('Home');
     } else {
       setError(res.error?.message || 'Login failed');
     }

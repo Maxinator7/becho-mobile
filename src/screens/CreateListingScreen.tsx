@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { CategoryPicker, CategoryNode } from '../components/CategoryPicker';
@@ -103,7 +104,7 @@ export const CreateListingScreen: React.FC<{ navigation: any }> = ({ navigation 
       submitted.data?.status === 'LIVE' ? 'Listing is live!' : 'Submitted for review',
       submitted.data?.status === 'LIVE' ? 'Buyers can now see your item.' : 'Our team will review it shortly.'
     );
-    navigation.navigate('Home');
+    navigation.popTo('Home');
   };
 
   return (

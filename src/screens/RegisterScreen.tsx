@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi, AuthTokens } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -54,7 +55,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     setLoading(false);
     if (res.success && res.data) {
       await login(res.data.tokens, res.data.user);
-      navigation.navigate('Home');
+      navigation.popTo('Home');
     } else {
       setError(res.error?.message || 'Verification failed');
     }
@@ -121,7 +122,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </>
         )}
 
-        <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.linkButton}>
+        <TouchableOpacity onPress={() => navigation.popTo('Login')} style={styles.linkButton}>
           <Text style={styles.linkText}>Already registered? Sign In</Text>
         </TouchableOpacity>
       </View>
