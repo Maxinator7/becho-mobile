@@ -5,7 +5,10 @@ import { fetchApi, AuthTokens } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { FormField, RuleList } from '../components/FormField';
 import { fieldErrors, passwordRules, validate } from '../utils/validation';
-import { Colors, useTheme, useThemedStyles } from '../theme/ThemeContext';
+import { Colors, font, useTheme, useThemedStyles } from '../theme/ThemeContext';
+import { Logo } from '../components/TopBar';
+import { Icon, IconButton } from '../components/ui';
+import { StackActions } from '@react-navigation/native';
 
 interface RegisterResult {
   tokens: AuthTokens;
@@ -82,7 +85,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     setLoading(false);
     if (res.success && res.data) {
       await login(res.data.tokens, res.data.user);
-      navigation.popTo('Home');
+      navigation.dispatch(StackActions.popToTop());
     } else {
       setErrors({ otp: res.error?.message || 'Verification failed' });
     }
@@ -101,8 +104,17 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   return (
     <SafeAreaView style={styles.container}>
+      {navigation.canGoBack() && (
+        <View style={{ paddingHorizontal: 8, paddingTop: 4 }}>
+          <IconButton name="arrow-left" label="Back" onPress={() => navigation.goBack()} />
+        </View>
+      )}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.brand}>
+            <Logo />
+            <Text style={styles.tagline}>Buy and sell with verified people near you</Text>
+          </View>
           <View style={styles.card}>
             <Text style={styles.title}>{sent ? 'Verify your email' : 'Create account'}</Text>
             {formError && <Text style={styles.errorText}>{formError}</Text>}
@@ -170,6 +182,10 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               </TouchableOpacity>
             )}
           </View>
+          <View style={styles.trust}>
+            <Icon name="shield-check-outline" size={14} color={colors.success} />
+            <Text style={styles.trustText}>Everyone on Becho verifies their email before trading</Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -179,13 +195,21 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 const makeStyles = (c: Colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-  card: { backgroundColor: c.surface, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: c.border },
-  title: { fontSize: 24, fontWeight: '700', color: c.text, marginBottom: 8, textAlign: 'center' },
-  info: { color: c.textSecondary, textAlign: 'center', marginTop: 4, lineHeight: 20 },
-  devOtp: { color: c.warning, textAlign: 'center', marginTop: 8, fontWeight: '700' },
-  button: { backgroundColor: c.primary, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 20 },
-  buttonText: { color: c.onPrimary, fontWeight: '600', fontSize: 16 },
-  errorText: { color: c.danger, textAlign: 'center', marginTop: 8 },
+  brand: { alignItems: 'center', marginBottom: 20, gap: 6 },
+  tagline: { fontFamily: font.regular, fontSize: 13, color: c.textMuted },
+  card: { backgroundColor: c.surface, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: c.border },
+  title: { fontSize: 22, fontFamily: font.heading, color: c.text, marginBottom: 4 },
+  info: { color: c.textSecondary, marginTop: 4, lineHeight: 20, fontFamily: font.regular, fontSize: 14 },
+  devOtp: { color: c.warning, marginTop: 8, fontFamily: font.bold },
+  alert: { flexDirection: 'row', gap: 8, backgroundColor: c.dangerSoft, borderWidth: 1, borderColor: c.dangerSoftBorder, borderRadius: 10, padding: 12, marginTop: 10 },
+  alertText: { color: c.danger, fontSize: 14, fontFamily: font.medium },
+  alertLink: { color: c.primaryText, fontFamily: font.semibold, marginTop: 6 },
+  errorText: { color: c.danger, marginTop: 8, fontFamily: font.medium },
+  forgot: { alignSelf: 'flex-end', marginTop: 12 },
+  button: { backgroundColor: c.primary, borderRadius: 10, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
+  buttonText: { color: c.onPrimary, fontFamily: font.semibold, fontSize: 16 },
   linkButton: { marginTop: 16, alignItems: 'center' },
-  linkText: { color: c.primary, fontSize: 14 },
+  linkText: { color: c.primaryText, fontSize: 14, fontFamily: font.semibold },
+  trust: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16 },
+  trustText: { fontFamily: font.regular, fontSize: 12, color: c.textMuted },
 });

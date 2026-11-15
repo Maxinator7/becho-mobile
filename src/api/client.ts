@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '../utils/storage';
 
 // Android emulator reaches the host machine at 10.0.2.2; iOS simulator can use localhost.
 // For a physical device set EXPO_PUBLIC_API_URL to your machine's LAN IP in .env.
@@ -31,8 +31,8 @@ export const session = {
   /** Loads persisted tokens on app start. */
   async restore(): Promise<AuthTokens | null> {
     const [accessToken, refreshToken] = await Promise.all([
-      SecureStore.getItemAsync(ACCESS_KEY),
-      SecureStore.getItemAsync(REFRESH_KEY),
+      storage.getItem(ACCESS_KEY),
+      storage.getItem(REFRESH_KEY),
     ]);
     tokens = accessToken && refreshToken ? { accessToken, refreshToken } : null;
     return tokens;
@@ -40,13 +40,13 @@ export const session = {
   async save(next: AuthTokens) {
     tokens = next;
     await Promise.all([
-      SecureStore.setItemAsync(ACCESS_KEY, next.accessToken),
-      SecureStore.setItemAsync(REFRESH_KEY, next.refreshToken),
+      storage.setItem(ACCESS_KEY, next.accessToken),
+      storage.setItem(REFRESH_KEY, next.refreshToken),
     ]);
   },
   async clear() {
     tokens = null;
-    await Promise.all([SecureStore.deleteItemAsync(ACCESS_KEY), SecureStore.deleteItemAsync(REFRESH_KEY)]);
+    await Promise.all([storage.deleteItem(ACCESS_KEY), storage.deleteItem(REFRESH_KEY)]);
   },
   get refreshToken() {
     return tokens?.refreshToken ?? null;

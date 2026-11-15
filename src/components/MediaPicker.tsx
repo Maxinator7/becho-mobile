@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, useTheme, useThemedStyles } from '../theme/ThemeContext';
+import { Colors, font, useTheme, useThemedStyles } from '../theme/ThemeContext';
+import { Icon } from './ui';
 import { MediaLimits, compressImage, fileSize, formatMB, uploadMedia } from '../utils/media';
 
 export interface MediaItem {
@@ -11,6 +12,8 @@ export interface MediaItem {
   status: 'uploading' | 'done' | 'error';
   progress: number;
   uploadId?: string;
+  /** Set for files already attached to the listing being edited (sent back as { mediaId }). */
+  mediaId?: string;
   error?: string;
 }
 
@@ -116,38 +119,54 @@ export const MediaPicker: React.FC<Props> = ({ items, onChange, limits }) => {
       return [item, ...next];
     });
 
+  const total = items.filter((m) => m.status !== 'error').length;
+  const maxTotal = limits.maxImagesPerListing + limits.maxVideosPerListing;
+
   return (
     <View>
-      <View style={styles.buttons}>
-        <TouchableOpacity style={styles.addBtn} onPress={pickFromLibrary} accessibilityRole="button">
-          <Text style={styles.addBtnText}>🖼️  Gallery</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.addBtn} onPress={takePhoto} accessibilityRole="button">
-          <Text style={styles.addBtnText}>📷  Camera</Text>
-        </TouchableOpacity>
+      <View style={styles.headRow}>
+        <Text style={styles.headTitle}>Photos & video</Text>
+        <Text style={styles.headCount}>{total} / {maxTotal} items</Text>
       </View>
-      <Text style={styles.hint}>
-        Up to {limits.maxImagesPerListing} photos and {limits.maxVideosPerListing} video ({formatMB(limits.maxVideoBytes)}, {limits.maxVideoSeconds}s max). First photo is the cover.
-      </Text>
+      <TouchableOpacity style={styles.dropTile} onPress={pickFromLibrary} accessibilityRole="button" accessibilityLabel="Add photos or a video from your gallery">
+        <View style={styles.dropIcon}>
+          <Icon name="camera-plus-outline" size={24} color={colors.primaryText} />
+        </View>
+        <Text style={styles.dropTitle}>Add photos (up to {limits.maxImagesPerListing}) & {limits.maxVideosPerListing} video</Text>
+        <Text style={styles.dropSub}>
+          Video up to {limits.maxVideoSeconds}s and {formatMB(limits.maxVideoBytes)}. The first photo is the cover.
+        </Text>
+        <TouchableOpacity style={styles.cameraBtn} onPress={takePhoto} accessibilityRole="button" accessibilityLabel="Take a photo with the camera">
+          <Icon name="camera-outline" size={16} color={colors.primaryText} />
+          <Text style={styles.cameraText}>Take a photo</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
       {notice && <Text style={styles.notice}>{notice}</Text>}
 
       {items.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 10 }}>
           {items.map((m, i) => (
             <View key={m.key} style={[styles.tile, m.status === 'error' && { borderColor: colors.danger, borderWidth: 2 }]}>
               {m.kind === 'IMAGE' ? (
                 <Image source={{ uri: m.previewUri }} style={styles.thumb} />
               ) : (
-                <View style={[styles.thumb, styles.videoThumb]}><Text style={styles.videoIcon}>▶</Text></View>
+                <View style={[styles.thumb, styles.videoThumb]}>
+                  <Icon name="play-circle-outline" size={30} color="#FFFFFF" />
+                </View>
               )}
-              {i === 0 && m.kind === 'IMAGE' && <Text style={[styles.tag, { backgroundColor: colors.primary }]}>Cover</Text>}
-              {m.kind === 'VIDEO' && <Text style={styles.tag}>Video</Text>}
-              <TouchableOpacity style={styles.remove} onPress={() => remove(m.key)} accessibilityLabel="Remove">
-                <Text style={styles.removeText}>✕</Text>
+              {i === 0 && m.kind === 'IMAGE' && <Text style={[styles.tag, { backgroundColor: colors.primary }]}>COVER</Text>}
+              {m.kind === 'VIDEO' && (
+                <View style={styles.videoTag}>
+                  <Icon name="video-outline" size={11} color="#FFFFFF" />
+                  <Text style={styles.videoTagText}>VIDEO</Text>
+                </View>
+              )}
+              <TouchableOpacity style={styles.remove} onPress={() => remove(m.key)} accessibilityLabel="Remove" hitSlop={6}>
+                <Icon name="close" size={14} color="#FFFFFF" />
               </TouchableOpacity>
               {i > 0 && m.kind === 'IMAGE' && m.status === 'done' && (
                 <TouchableOpacity style={styles.coverBtn} onPress={() => makeCover(m.key)} accessibilityLabel="Make cover photo">
-                  <Text style={styles.coverBtnText}>Cover</Text>
+                  <Text style={styles.coverBtnText}>Set cover</Text>
                 </TouchableOpacity>
               )}
               {m.status === 'uploading' && (
@@ -167,22 +186,27 @@ export const MediaPicker: React.FC<Props> = ({ items, onChange, limits }) => {
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    buttons: { flexDirection: 'row', gap: 10 },
-    addBtn: { flex: 1, paddingVertical: 14, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: c.inputBorder, backgroundColor: c.surface2, alignItems: 'center' },
-    addBtnText: { color: c.text, fontWeight: '600' },
-    hint: { color: c.textMuted, fontSize: 12, marginTop: 8 },
-    notice: { color: c.danger, fontSize: 12, marginTop: 6 },
-    tile: { width: 96, height: 96, borderRadius: 10, overflow: 'hidden', backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border },
+    headRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 },
+    headTitle: { fontFamily: font.heading, fontSize: 17, color: c.text },
+    headCount: { fontFamily: font.semibold, fontSize: 12, color: c.textMuted },
+    dropTile: { alignItems: 'center', paddingVertical: 18, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.borderStrong, backgroundColor: c.surface },
+    dropIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    dropTitle: { fontFamily: font.semibold, fontSize: 14, color: c.text, textAlign: 'center' },
+    dropSub: { fontFamily: font.regular, fontSize: 12, color: c.textMuted, textAlign: 'center', marginTop: 2 },
+    cameraBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: c.primarySoft },
+    cameraText: { fontFamily: font.semibold, fontSize: 12, color: c.primaryText },
+    notice: { color: c.danger, fontSize: 12, marginTop: 6, fontFamily: font.medium },
+    tile: { width: 92, height: 92, borderRadius: 10, overflow: 'hidden', backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border },
     thumb: { width: '100%', height: '100%' },
-    videoThumb: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' },
-    videoIcon: { color: '#fff', fontSize: 28 },
-    tag: { position: 'absolute', left: 4, top: 4, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, fontWeight: '700', overflow: 'hidden' },
+    videoThumb: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A' },
+    tag: { position: 'absolute', left: 4, top: 4, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, color: '#fff', fontSize: 9, fontFamily: font.bold, overflow: 'hidden', letterSpacing: 0.4 },
+    videoTag: { position: 'absolute', left: 4, bottom: 4, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.65)' },
+    videoTagText: { color: '#fff', fontSize: 9, fontFamily: font.bold },
     remove: { position: 'absolute', right: 4, top: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
-    removeText: { color: '#fff', fontSize: 12 },
-    coverBtn: { position: 'absolute', left: 4, bottom: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: 'rgba(0,0,0,0.65)' },
-    coverBtnText: { color: '#fff', fontSize: 10 },
+    coverBtn: { position: 'absolute', left: 4, bottom: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.65)' },
+    coverBtnText: { color: '#fff', fontSize: 9, fontFamily: font.semibold },
     progressOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
-    progressText: { color: '#fff', fontWeight: '700' },
+    progressText: { color: '#fff', fontFamily: font.bold },
     progressBar: { position: 'absolute', left: 0, bottom: 0, height: 4, backgroundColor: c.primary },
     errorText: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 3, backgroundColor: c.danger, color: '#fff', fontSize: 9 },
   });

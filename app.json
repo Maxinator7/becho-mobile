@@ -17,7 +17,9 @@
       ]
     },
     "plugins": [
-      "expo-video"
+      "expo-video",
+      "expo-font",
+      "expo-splash-screen"
     ]
   }
 }

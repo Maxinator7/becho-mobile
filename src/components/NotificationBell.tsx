@@ -1,33 +1,30 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useNotifications } from '../context/NotificationsContext';
-import { Colors, useThemedStyles } from '../theme/ThemeContext';
+import { Colors, font, useThemedStyles } from '../theme/ThemeContext';
+import { IconButton } from './ui';
 
 /** Bell with an unread badge; opens the Notifications screen. */
 export const NotificationBell: React.FC<{ onPress: () => void }> = ({ onPress }) => {
   const { unreadCount } = useNotifications();
   const styles = useThemedStyles(makeStyles);
   return (
-    <TouchableOpacity
-      style={styles.button}
+    <IconButton
+      name="bell-outline"
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+      label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
     >
-      <Text style={styles.icon}>🔔</Text>
       {unreadCount > 0 && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
         </View>
       )}
-    </TouchableOpacity>
+    </IconButton>
   );
 };
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    button: { width: 38, height: 38, borderRadius: 19, backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
-    icon: { fontSize: 17 },
-    badge: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center' },
-    badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+    badge: { position: 'absolute', top: 3, right: 2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: c.surface },
+    badgeText: { color: '#fff', fontSize: 9, fontFamily: font.bold },
   });

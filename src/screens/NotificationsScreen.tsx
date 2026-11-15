@@ -3,29 +3,27 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, Touchabl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi } from '../api/client';
 import { AppNotification, notificationTarget, useNotifications } from '../context/NotificationsContext';
-import { Colors, useTheme, useThemedStyles } from '../theme/ThemeContext';
+import { EmptyState, Icon, IconName, ScreenHeader } from '../components/ui';
+import { timeAgo } from '../utils/format';
+import { Tone } from '../utils/listing';
+import { Colors, font, useTheme, useThemedStyles } from '../theme/ThemeContext';
 
-const ICONS: Record<string, string> = {
-  MESSAGE_RECEIVED: '💬',
-  OFFER_CREATED: '🏷️',
-  OFFER_COUNTERED: '🔄',
-  OFFER_ACCEPTED: '🤝',
-  OFFER_REJECTED: '❌',
-  LISTING_APPROVED: '✅',
-  LISTING_REJECTED: '⚠️',
-  LISTING_SUSPENDED: '⚠️',
-  LISTING_EXPIRED: '⏳',
-  LISTING_SOLD: '📦',
-  RESERVATION_RELEASED: '🔁',
+const ICONS: Record<string, [IconName, Tone]> = {
+  MESSAGE_RECEIVED: ['chat-outline', 'primary'],
+  OFFER_CREATED: ['tag-outline', 'primary'],
+  OFFER_COUNTERED: ['swap-horizontal', 'warning'],
+  OFFER_ACCEPTED: ['handshake-outline', 'success'],
+  OFFER_REJECTED: ['close-circle-outline', 'danger'],
+  LISTING_APPROVED: ['check-circle-outline', 'success'],
+  LISTING_VERIFIED: ['check-decagram-outline', 'success'],
+  LISTING_REJECTED: ['alert-outline', 'danger'],
+  LISTING_CHANGES_REQUESTED: ['pencil-outline', 'danger'],
+  LISTING_REMARK: ['message-alert-outline', 'warning'],
+  LISTING_SUSPENDED: ['alert-outline', 'danger'],
+  LISTING_EXPIRED: ['timer-sand', 'neutral'],
+  LISTING_SOLD: ['package-variant-closed', 'neutral'],
+  RESERVATION_RELEASED: ['lock-open-variant-outline', 'warning'],
 };
-
-function timeAgo(iso: string) {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-}
 
 export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { refresh: refreshCount, unreadCount } = useNotifications();
@@ -61,44 +59,44 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
     refreshCount();
   };
 
+  const tone = (t: Tone) =>
+    ({ success: [colors.success, colors.successSoft], warning: [colors.warning, colors.warningSoft], danger: [colors.danger, colors.dangerSoft], primary: [colors.primaryText, colors.primarySoft], neutral: [colors.textSecondary, colors.surface2] })[t];
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityRole="button">
-          <Text style={styles.back}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Notifications</Text>
-        {items.some((n) => !n.isRead) ? (
-          <TouchableOpacity onPress={markAll} accessibilityRole="button">
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScreenHeader
+        title="Notifications"
+        onBack={() => navigation.goBack()}
+        right={items.some((n) => !n.isRead) ? (
+          <TouchableOpacity onPress={markAll} accessibilityRole="button" hitSlop={8}>
             <Text style={styles.markAll}>Mark all read</Text>
           </TouchableOpacity>
-        ) : <View style={{ width: 80 }} />}
-      </View>
-
+        ) : null}
+      />
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(n) => n.id}
-          contentContainerStyle={{ padding: 12, flexGrow: 1 }}
+          contentContainerStyle={{ padding: 16, gap: 8, flexGrow: 1 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} tintColor={colors.primary} />}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Text style={styles.empty}>No notifications yet.{'\n'}You'll see new messages and offers here.</Text>
-            </View>
-          }
-          renderItem={({ item: n }) => (
-            <TouchableOpacity style={[styles.row, !n.isRead && styles.rowUnread]} onPress={() => open(n)} accessibilityRole="button">
-              <Text style={styles.icon}>{ICONS[n.type] ?? '🔔'}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.rowTitle, !n.isRead && { fontWeight: '800' }]}>{n.title}</Text>
-                <Text style={styles.rowBody}>{n.body}</Text>
-                <Text style={styles.rowTime}>{timeAgo(n.createdAt)}</Text>
-              </View>
-              {!n.isRead && <View style={styles.dot} />}
-            </TouchableOpacity>
-          )}
+          ListEmptyComponent={<EmptyState icon="bell-outline" title="No notifications yet" body="You'll see new messages, offers and updates about your ads here." />}
+          renderItem={({ item: n }) => {
+            const [icon, t] = ICONS[n.type] ?? (['bell-outline', 'neutral'] as [IconName, Tone]);
+            const [fg, bg] = tone(t);
+            return (
+              <TouchableOpacity style={[styles.row, !n.isRead && styles.rowUnread]} onPress={() => open(n)} accessibilityRole="button" accessibilityLabel={`${n.title}${n.isRead ? '' : ', unread'}`}>
+                <View style={[styles.icon, { backgroundColor: bg }]}><Icon name={icon} size={20} color={fg} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowTitle, !n.isRead && { fontFamily: font.bold }]}>{n.title}</Text>
+                  <Text style={styles.rowBody}>{n.body}</Text>
+                  <Text style={styles.rowTime}>{timeAgo(n.createdAt)}</Text>
+                </View>
+                {!n.isRead && <View style={styles.dot} />}
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
     </SafeAreaView>
@@ -108,17 +106,12 @@ export const NotificationsScreen: React.FC<{ navigation: any }> = ({ navigation 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: c.surface },
-    back: { color: c.primary, fontSize: 16, width: 80 },
-    title: { color: c.text, fontSize: 18, fontWeight: '800' },
-    markAll: { color: c.primary, fontSize: 13, fontWeight: '700', width: 80, textAlign: 'right' },
-    empty: { color: c.textSecondary, textAlign: 'center', lineHeight: 22 },
-    row: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', padding: 14, borderRadius: 12, marginBottom: 6 },
-    rowUnread: { backgroundColor: c.surface2 },
-    icon: { fontSize: 20, marginTop: 1 },
-    rowTitle: { color: c.text, fontSize: 15, fontWeight: '600' },
-    rowBody: { color: c.textSecondary, fontSize: 13, marginTop: 2, lineHeight: 18 },
-    rowTime: { color: c.textMuted, fontSize: 11, marginTop: 4 },
-    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary, marginTop: 6 },
+    markAll: { color: c.primaryText, fontSize: 13, fontFamily: font.semibold },
+    row: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', padding: 14, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
+    rowUnread: { borderColor: c.primarySoftBorder },
+    icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    rowTitle: { color: c.text, fontSize: 15, fontFamily: font.semibold },
+    rowBody: { color: c.textSecondary, fontSize: 13, marginTop: 2, lineHeight: 18, fontFamily: font.regular },
+    rowTime: { color: c.textMuted, fontSize: 11, marginTop: 6, fontFamily: font.regular },
+    dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: c.primary, marginTop: 6 },
   });

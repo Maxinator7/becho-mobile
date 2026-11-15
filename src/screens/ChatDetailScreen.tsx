@@ -1,11 +1,27 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi } from '../api/client';
 import { formatPrice } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationsContext';
-import { Colors, useTheme, useThemedStyles } from '../theme/ThemeContext';
+import { Avatar, Button, Chip, Icon, IconButton, IconName, sheetStyles } from '../components/ui';
+import { Colors, font, useTheme, useThemedStyles } from '../theme/ThemeContext';
+import { Tone } from '../utils/listing';
 
 interface MessageItem {
   id: string;
@@ -21,7 +37,7 @@ interface MessageItem {
 interface ConversationMeta {
   id: string;
   listingId: string;
-  listing: { id: string; title: string; price: number; status: string };
+  listing: { id: string; title: string; price: number; status: string; media?: { url: string }[] };
   buyer: { id: string; displayName: string };
   seller: { id: string; displayName: string };
 }
@@ -42,18 +58,27 @@ interface Offer {
   parentOffer?: { id: string; amount: number; status: string } | null;
 }
 
-const EVENT_ICONS: Record<string, string> = {
-  OFFER_MADE: '🏷️',
-  OFFER_COUNTERED: '🔄',
-  OFFER_ACCEPTED: '🤝',
-  OFFER_REJECTED: '❌',
-  OFFER_WITHDRAWN: '↩️',
-  LISTING_SOLD: '📦',
-  RESERVATION_RELEASED: '🔁',
+const EVENTS: Record<string, { icon: IconName; verb: string }> = {
+  OFFER_MADE: { icon: 'tag-outline', verb: 'made an offer' },
+  OFFER_COUNTERED: { icon: 'swap-horizontal', verb: 'countered' },
+  OFFER_ACCEPTED: { icon: 'handshake-outline', verb: 'accepted the offer' },
+  OFFER_REJECTED: { icon: 'close-circle-outline', verb: 'declined the offer' },
+  OFFER_WITHDRAWN: { icon: 'undo-variant', verb: 'withdrew the offer' },
+  LISTING_SOLD: { icon: 'package-variant-closed', verb: 'marked the item as sold' },
+  RESERVATION_RELEASED: { icon: 'lock-open-variant-outline', verb: 'cancelled the reservation' },
 };
 
-const statusColor = (c: Colors, status: string) =>
-  ({ PENDING: c.warning, ACCEPTED: c.success, REJECTED: c.danger, COUNTERED: c.primary } as Record<string, string>)[status] ?? c.textMuted;
+const OFFER_STATUS: Record<string, { label: string; tone: Tone }> = {
+  PENDING: { label: 'Pending', tone: 'warning' },
+  COUNTERED: { label: 'Countered', tone: 'neutral' },
+  ACCEPTED: { label: 'Accepted', tone: 'success' },
+  REJECTED: { label: 'Declined', tone: 'danger' },
+  CANCELLED: { label: 'Cancelled', tone: 'neutral' },
+  WITHDRAWN: { label: 'Withdrawn', tone: 'neutral' },
+  EXPIRED: { label: 'Expired', tone: 'neutral' },
+};
+
+const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
 
 export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { conversationId } = route.params;
@@ -61,6 +86,7 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   const { refresh: refreshNotifications } = useNotifications();
   const { colors } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const sheet = useThemedStyles(sheetStyles);
 
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [meta, setMeta] = useState<ConversationMeta | null>(null);
@@ -69,6 +95,7 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   const [offers, setOffers] = useState<Offer[]>([]);
   const [showOffersModal, setShowOffersModal] = useState(false);
   const [showCounterModal, setShowCounterModal] = useState(false);
+  const [showNewOffer, setShowNewOffer] = useState(false);
   const [counterTargetOffer, setCounterTargetOffer] = useState<Offer | null>(null);
   const [counterAmount, setCounterAmount] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
@@ -166,6 +193,22 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
     }
   };
 
+  /** Buyer starts a new offer from the chat (same as "Make offer" on the listing). */
+  const handleNewOffer = async () => {
+    if (!meta) return;
+    const amount = parseFloat(counterAmount);
+    if (isNaN(amount) || amount <= 0) { Alert.alert('Invalid amount', 'Enter a valid amount in ₹.'); return; }
+    setBusy(true);
+    const res = await fetchApi<Offer>('/offers', { method: 'POST', body: JSON.stringify({ listingId: meta.listingId, amount, message: counterMessage || undefined }) });
+    setBusy(false);
+    if (res.success) {
+      setShowNewOffer(false);
+      void loadData();
+    } else {
+      Alert.alert('Could not send offer', res.error?.message || 'Please try again.');
+    }
+  };
+
   /** Seller closes the deal (sold) or puts the item back on sale. */
   const handleDealAction = (action: 'mark-sold' | 'mark-available') => {
     if (!meta) return;
@@ -193,6 +236,24 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   const awaitingMyReply = pendingOffers.some((o) => o.proposedById !== user?.id);
   const iAmSeller = meta?.seller.id === user?.id;
   const listingStatus = meta?.listing.status;
+  const other = meta ? (iAmSeller ? meta.buyer : meta.seller) : null;
+  const canMakeOffer = !iAmSeller && listingStatus === 'LIVE' && pendingOffers.length === 0;
+
+  const openNewOffer = () => {
+    if (!meta) return;
+    setCounterAmount(String(Math.floor(meta.listing.price * 0.9)));
+    setCounterMessage('');
+    setShowNewOffer(true);
+  };
+
+  const openActions = () => {
+    const options: { text: string; onPress?: () => void; style?: 'cancel' }[] = [];
+    if (canMakeOffer) options.push({ text: 'Make an offer', onPress: openNewOffer });
+    if (offers.length) options.push({ text: 'View offers', onPress: () => setShowOffersModal(true) });
+    if (meta) options.push({ text: 'View ad', onPress: () => navigation.navigate('ProductDetails', { listingId: meta.listingId }) });
+    options.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Actions', undefined, options);
+  };
 
   if (loading) {
     return (
@@ -205,15 +266,30 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   const renderMessage = ({ item }: { item: MessageItem }) => {
     const isMe = item.senderId === user?.id;
     if (item.kind === 'EVENT') {
-      const text = isMe && item.sender ? item.content.replace(item.sender.displayName, 'You') : item.content;
-      const canRespond = !isMe && pendingOffers.some((o) => o.id === item.metadata?.offerId);
+      const event = item.metadata?.event ?? '';
+      const def = EVENTS[event];
+      const who = isMe ? 'You' : item.sender?.displayName ?? (iAmSeller ? meta?.buyer.displayName : meta?.seller.displayName) ?? 'Someone';
+      const offer = offers.find((o) => o.id === item.metadata?.offerId);
+      const canRespond = !isMe && offer?.status === 'PENDING';
+      const isDeal = event === 'OFFER_ACCEPTED';
+      const status = (event === 'OFFER_MADE' || event === 'OFFER_COUNTERED') && offer ? OFFER_STATUS[offer.status] : null;
       return (
         <View style={styles.eventWrap}>
-          <View style={styles.eventPill}>
-            <Text style={styles.eventText}>{EVENT_ICONS[item.metadata?.event ?? ''] ?? 'ℹ️'}  {text}</Text>
+          <View style={[styles.eventCard, isDeal && styles.eventDeal]}>
+            <View style={[styles.eventIcon, isDeal && { backgroundColor: colors.surface }]}>
+              <Icon name={def?.icon ?? 'information-outline'} size={18} color={isDeal ? colors.success : colors.primaryText} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.eventLabel, isDeal && { color: colors.success, fontFamily: font.semibold }]}>
+                {def ? `${who} ${def.verb}` : isMe && item.sender ? item.content.replace(item.sender.displayName, 'You') : item.content}
+              </Text>
+              {item.metadata?.amount != null && <Text style={styles.eventAmount}>{formatPrice(item.metadata.amount)}</Text>}
+              {isDeal && <Text style={styles.eventSub}>The item is reserved — agree a time and place to meet.</Text>}
+            </View>
+            {status && <Chip label={status.label} tone={status.tone} uppercase={false} />}
           </View>
           <Text style={styles.eventTime}>
-            {new Date(item.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            {time(item.createdAt)}
             {canRespond ? '  ·  ' : ''}
             {canRespond && <Text style={styles.respond} onPress={() => setShowOffersModal(true)}>Respond</Text>}
           </Text>
@@ -225,166 +301,229 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
         <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
           <Text style={isMe ? styles.msgTextMe : styles.msgText}>{item.content}</Text>
         </View>
-        <Text style={[styles.timeText, { textAlign: isMe ? 'right' : 'left' }]}>
-          {new Date(item.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-        </Text>
+        <Text style={[styles.timeText, { textAlign: isMe ? 'right' : 'left' }]}>{time(item.createdAt)}</Text>
       </View>
     );
   };
 
+  const amountSheet = (visible: boolean, title: string, sub: React.ReactNode, cta: string, onSubmit: () => void, onClose: () => void) => (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <Pressable style={sheet.overlay} onPress={onClose}>
+          <Pressable style={sheet.sheet}>
+            <View style={sheet.handle} />
+            <View style={sheet.titleRow}>
+              <Text style={sheet.title}>{title}</Text>
+              <IconButton name="close" label="Close" onPress={onClose} />
+            </View>
+            {sub}
+            <Text style={styles.inputLabel}>Amount</Text>
+            <View style={styles.amountRow}>
+              <Text style={styles.rupee}>₹</Text>
+              <TextInput style={styles.amountInput} keyboardType="number-pad" value={counterAmount} onChangeText={(t) => setCounterAmount(t.replace(/[^\d]/g, ''))} placeholder="Enter amount" placeholderTextColor={colors.placeholder} accessibilityLabel="Amount in rupees" />
+            </View>
+            <Text style={styles.inputLabel}>Message (optional)</Text>
+            <TextInput style={[styles.input, { height: 70, textAlignVertical: 'top' }]} multiline value={counterMessage} onChangeText={setCounterMessage} placeholder="Best I can do…" placeholderTextColor={colors.placeholder} />
+            <Button title={cta} onPress={onSubmit} loading={busy} />
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Offers sheet */}
       <Modal visible={showOffersModal} transparent animationType="slide" onRequestClose={() => setShowOffersModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Offers</Text>
-              <TouchableOpacity onPress={() => setShowOffersModal(false)} accessibilityLabel="Close">
-                <Text style={styles.close}>✕</Text>
-              </TouchableOpacity>
+        <Pressable style={sheet.overlay} onPress={() => setShowOffersModal(false)}>
+          <Pressable style={sheet.sheet}>
+            <View style={sheet.handle} />
+            <View style={sheet.titleRow}>
+              <Text style={sheet.title}>Offers</Text>
+              <IconButton name="close" label="Close" onPress={() => setShowOffersModal(false)} />
             </View>
             <FlatList
               data={offers}
               keyExtractor={(o) => o.id}
-              style={{ maxHeight: 420 }}
+              style={{ maxHeight: 440 }}
               ListEmptyComponent={<Text style={styles.emptyOffers}>No offers yet.</Text>}
               renderItem={({ item: offer }) => {
                 const isMine = offer.proposedById === user?.id;
                 const canAct = !isMine && offer.status === 'PENDING';
                 const canCancel = isMine && offer.status === 'PENDING';
-                const color = statusColor(colors, offer.status);
+                const st = OFFER_STATUS[offer.status] ?? { label: offer.status, tone: 'neutral' as Tone };
                 return (
-                  <View style={[styles.offerCard, { borderColor: color }]}>
+                  <View style={styles.offerCard}>
                     <View style={styles.offerCardRow}>
-                      <Text style={[styles.offerAmount, { color }]}>{formatPrice(offer.amount)}</Text>
-                      <Text style={[styles.offerStatus, { color, borderColor: color }]}>{offer.status}</Text>
+                      <Text style={styles.offerAmount}>{formatPrice(offer.amount)}</Text>
+                      <Chip label={st.label} tone={st.tone} uppercase={false} />
                     </View>
                     <Text style={styles.offerMeta}>
-                      From {isMine ? 'you' : offer.proposedBy.displayName} · {new Date(offer.createdAt).toLocaleDateString('en-IN')}
+                      From {isMine ? 'you' : offer.proposedBy.displayName} · {new Date(offer.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                     </Text>
-                    {offer.message ? <Text style={styles.offerMsg}>"{offer.message}"</Text> : null}
-                    {offer.parentOffer ? <Text style={styles.offerReply}>↩ In reply to {formatPrice(offer.parentOffer.amount)}</Text> : null}
+                    {offer.message ? <Text style={styles.offerMsg}>“{offer.message}”</Text> : null}
+                    {offer.parentOffer ? <Text style={styles.offerReply}>In reply to {formatPrice(offer.parentOffer.amount)}</Text> : null}
                     {(canAct || canCancel) && (
                       <View style={styles.offerActions}>
                         {canAct && (
                           <>
-                            <TouchableOpacity disabled={busy} style={[styles.offerActionBtn, { borderColor: colors.success, backgroundColor: colors.successSoft }]} onPress={() => confirmOfferAction(offer, 'accept')}>
-                              <Text style={[styles.offerActionText, { color: colors.success }]}>Accept</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity disabled={busy} style={[styles.offerActionBtn, { borderColor: colors.primary, backgroundColor: colors.primarySoft }]} onPress={() => handleOpenCounter(offer)}>
-                              <Text style={[styles.offerActionText, { color: colors.primary }]}>Counter</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity disabled={busy} style={[styles.offerActionBtn, { borderColor: colors.danger, backgroundColor: colors.dangerSoft }]} onPress={() => confirmOfferAction(offer, 'reject')}>
-                              <Text style={[styles.offerActionText, { color: colors.danger }]}>Decline</Text>
-                            </TouchableOpacity>
+                            <Button title="Accept" size="sm" variant="strong" disabled={busy} onPress={() => confirmOfferAction(offer, 'accept')} style={{ flex: 1 }} />
+                            <Button title="Counter" size="sm" variant="soft" disabled={busy} onPress={() => handleOpenCounter(offer)} style={{ flex: 1 }} />
+                            <Button title="Decline" size="sm" variant="outline" disabled={busy} onPress={() => confirmOfferAction(offer, 'reject')} style={{ flex: 1 }} />
                           </>
                         )}
-                        {canCancel && (
-                          <TouchableOpacity disabled={busy} style={[styles.offerActionBtn, { borderColor: colors.borderStrong }]} onPress={() => confirmOfferAction(offer, 'cancel')}>
-                            <Text style={[styles.offerActionText, { color: colors.textSecondary }]}>Withdraw</Text>
-                          </TouchableOpacity>
-                        )}
+                        {canCancel && <Button title="Withdraw" size="sm" variant="outline" disabled={busy} onPress={() => confirmOfferAction(offer, 'cancel')} style={{ flex: 1 }} />}
                       </View>
                     )}
                   </View>
                 );
               }}
             />
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
-      {/* Counter offer sheet */}
-      <Modal visible={showCounterModal} transparent animationType="slide" onRequestClose={() => setShowCounterModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Counter offer</Text>
-                <TouchableOpacity onPress={() => setShowCounterModal(false)} accessibilityLabel="Close">
-                  <Text style={styles.close}>✕</Text>
-                </TouchableOpacity>
-              </View>
-              {counterTargetOffer && (
-                <Text style={styles.modalSub}>Their offer: <Text style={{ color: colors.warning, fontWeight: '700' }}>{formatPrice(counterTargetOffer.amount)}</Text></Text>
-              )}
-              <Text style={styles.inputLabel}>Your amount (₹)</Text>
-              <TextInput style={styles.input} keyboardType="number-pad" value={counterAmount} onChangeText={(t) => setCounterAmount(t.replace(/[^\d]/g, ''))} placeholder="Enter amount" placeholderTextColor={colors.placeholder} />
-              <Text style={styles.inputLabel}>Message (optional)</Text>
-              <TextInput style={[styles.input, { height: 70, textAlignVertical: 'top' }]} multiline value={counterMessage} onChangeText={setCounterMessage} placeholder="Best I can do…" placeholderTextColor={colors.placeholder} />
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmitCounter} disabled={busy}>
-                {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.submitBtnText}>Send counter offer</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      {amountSheet(
+        showCounterModal,
+        'Counter offer',
+        counterTargetOffer ? <Text style={styles.modalSub}>Their offer: <Text style={{ color: colors.text, fontFamily: font.bold }}>{formatPrice(counterTargetOffer.amount)}</Text></Text> : null,
+        'Send counter offer',
+        handleSubmitCounter,
+        () => setShowCounterModal(false)
+      )}
+      {amountSheet(
+        showNewOffer,
+        'Make an offer',
+        meta ? <Text style={styles.modalSub}>Listed at <Text style={{ color: colors.text, fontFamily: font.bold }}>{formatPrice(meta.listing.price)}</Text></Text> : null,
+        'Send offer',
+        handleNewOffer,
+        () => setShowNewOffer(false)
+      )}
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button">
-            <Text style={styles.backBtnText}>← Back</Text>
-          </TouchableOpacity>
-          {meta && (
-            <View style={styles.headerContent}>
-              <TouchableOpacity style={{ flex: 1, marginRight: 10 }} onPress={() => navigation.navigate('ProductDetails', { listingId: meta.listingId })}>
-                <Text style={styles.headerTitle} numberOfLines={1}>{meta.listing.title}</Text>
-                <Text style={styles.headerSub}>{formatPrice(meta.listing.price)}</Text>
-              </TouchableOpacity>
-              {offers.length > 0 && (
-                <TouchableOpacity style={[styles.offersBadge, awaitingMyReply && styles.offersBadgeAlert]} onPress={() => setShowOffersModal(true)}>
-                  <Text style={[styles.offersBadgeText, awaitingMyReply && { color: colors.warning }]}>
-                    {awaitingMyReply ? '🏷️ Offer for you' : pendingOffers.length ? `🏷️ ${pendingOffers.length} pending` : '🏷️ Offers'}
-                  </Text>
-                </TouchableOpacity>
-              )}
+          <IconButton name="arrow-left" label="Back" onPress={() => navigation.goBack()} />
+          {other && <Avatar name={other.displayName} size={38} />}
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.headerName} numberOfLines={1}>{other?.displayName ?? 'Chat'}</Text>
+              {other && <Icon name="check-decagram" size={15} color={colors.primary} accessibilityLabel="Verified account" />}
             </View>
+            <Text style={styles.headerSub}>{iAmSeller ? 'Buyer' : 'Seller'}</Text>
+          </View>
+          {offers.length > 0 && (
+            <TouchableOpacity style={[styles.offersBadge, awaitingMyReply && styles.offersBadgeAlert]} onPress={() => setShowOffersModal(true)} accessibilityRole="button">
+              <Icon name="tag-outline" size={14} color={awaitingMyReply ? colors.warning : colors.text} />
+              <Text style={[styles.offersBadgeText, awaitingMyReply && { color: colors.warning }]}>
+                {awaitingMyReply ? 'Offer for you' : pendingOffers.length ? `${pendingOffers.length} pending` : 'Offers'}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* Deal status */}
+        {/* Listing strip */}
+        {meta && (
+          <View style={styles.strip}>
+            {meta.listing.media?.[0]?.url ? (
+              <Image source={{ uri: meta.listing.media[0].url }} style={styles.stripThumb} />
+            ) : (
+              <View style={[styles.stripThumb, styles.center]}><Icon name="image-outline" size={18} color={colors.textMuted} /></View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.stripTitle} numberOfLines={1}>{meta.listing.title}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.stripPrice}>{formatPrice(meta.listing.price)}</Text>
+                {listingStatus && listingStatus !== 'LIVE' && <Chip label={listingStatus === 'RESERVED' ? 'Reserved' : listingStatus === 'SOLD' ? 'Sold' : 'Unavailable'} tone={listingStatus === 'RESERVED' ? 'primary' : 'neutral'} />}
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('ProductDetails', { listingId: meta.listingId })} accessibilityRole="button" hitSlop={8}>
+              <Text style={styles.viewAd}>View ad</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Deal panel */}
         {listingStatus === 'RESERVED' && acceptedOffer && (
-          <View style={styles.dealBanner}>
-            <Text style={styles.dealTitle}>🤝 Deal agreed at {formatPrice(acceptedOffer.amount)}</Text>
-            <Text style={styles.dealBody}>
-              {iAmSeller
-                ? `Reserved for ${acceptedOffer.buyer.displayName}. Arrange a meet-up here, then mark it as sold once you've been paid.`
-                : 'The seller reserved this for you. Agree a time and a safe public place to meet, check the item, then pay on handover.'}
-            </Text>
+          <View style={styles.deal}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Icon name="handshake-outline" size={22} color={colors.success} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dealTitle}>Deal agreed for {formatPrice(acceptedOffer.amount)}!</Text>
+                <Text style={styles.dealBody}>
+                  {iAmSeller
+                    ? `Reserved for ${acceptedOffer.buyer.displayName}. Arrange a meet-up here, then mark it as sold once you've been paid.`
+                    : 'Reserved for you. Agree a time and a safe public place to meet, check the item, then pay on handover.'}
+                </Text>
+              </View>
+              <View style={styles.reservedPill}><Text style={styles.reservedText}>RESERVED</Text></View>
+            </View>
             {iAmSeller && (
               <View style={styles.dealActions}>
-                <TouchableOpacity disabled={busy} style={styles.soldBtn} onPress={() => handleDealAction('mark-sold')}>
-                  <Text style={styles.soldBtnText}>Mark as sold</Text>
-                </TouchableOpacity>
-                <TouchableOpacity disabled={busy} style={styles.releaseBtn} onPress={() => handleDealAction('mark-available')}>
-                  <Text style={styles.releaseBtnText}>Cancel reservation</Text>
-                </TouchableOpacity>
+                <Button title="Mark as sold" icon="check-circle-outline" variant="strong" size="sm" disabled={busy} onPress={() => handleDealAction('mark-sold')} style={{ flex: 1 }} />
+                <Button title="Cancel reservation" variant="outline" size="sm" disabled={busy} onPress={() => handleDealAction('mark-available')} style={{ flex: 1 }} />
               </View>
             )}
           </View>
         )}
         {listingStatus === 'RESERVED' && !acceptedOffer && (
-          <Text style={styles.infoBar}>ℹ️ This item is reserved for another buyer. You'll be notified if it becomes available.</Text>
+          <View style={styles.infoBar}>
+            <Icon name="information-outline" size={16} color={colors.textMuted} />
+            <Text style={styles.infoText}>This item is reserved for another buyer. You'll be notified if it becomes available.</Text>
+          </View>
         )}
-        {listingStatus === 'SOLD' && <Text style={styles.infoBar}>📦 This item has been sold.</Text>}
+        {listingStatus === 'SOLD' && (
+          <View style={styles.infoBar}>
+            <Icon name="package-variant-closed" size={16} color={colors.textMuted} />
+            <Text style={styles.infoText}>This item has been sold.</Text>
+          </View>
+        )}
 
         {/* Messages */}
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={{ padding: 16, flexGrow: 1 }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           renderItem={renderMessage}
+          ListEmptyComponent={<Text style={styles.emptyChat}>Say hello and ask about the item. Keep chats and offers in Becho.</Text>}
         />
 
-        {/* Input */}
-        <View style={styles.inputContainer}>
-          <TextInput style={styles.textInput} placeholder="Type a message…" placeholderTextColor={colors.placeholder} value={input} onChangeText={setInput} />
-          <TouchableOpacity style={[styles.sendBtn, !input.trim() && { opacity: 0.5 }]} onPress={handleSend} disabled={!input.trim()}>
-            <Text style={styles.sendBtnText}>Send</Text>
+        {/* Quick actions */}
+        {(canMakeOffer || awaitingMyReply) && (
+          <View style={styles.quick}>
+            {canMakeOffer && (
+              <TouchableOpacity style={styles.quickChip} onPress={openNewOffer} accessibilityRole="button">
+                <Icon name="tag-outline" size={15} color={colors.primaryText} />
+                <Text style={styles.quickText}>Make an offer</Text>
+              </TouchableOpacity>
+            )}
+            {awaitingMyReply && (
+              <TouchableOpacity style={styles.quickChip} onPress={() => setShowOffersModal(true)} accessibilityRole="button">
+                <Icon name="swap-horizontal" size={15} color={colors.primaryText} />
+                <Text style={styles.quickText}>Respond to offer</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Composer */}
+        <View style={styles.composer}>
+          <TouchableOpacity style={styles.plus} onPress={openActions} accessibilityRole="button" accessibilityLabel="More actions">
+            <Icon name="plus" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Type a message…"
+            placeholderTextColor={colors.placeholder}
+            value={input}
+            onChangeText={setInput}
+            multiline
+            accessibilityLabel="Message"
+          />
+          <TouchableOpacity style={[styles.sendBtn, !input.trim() && { opacity: 0.5 }]} onPress={handleSend} disabled={!input.trim()} accessibilityRole="button" accessibilityLabel="Send">
+            <Icon name="send" size={20} color={colors.onPrimary} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -396,61 +535,63 @@ const makeStyles = (c: Colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: { padding: 16, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: c.surface },
-    backBtn: { marginBottom: 8 },
-    backBtnText: { color: c.primary, fontSize: 16 },
-    headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    headerTitle: { color: c.text, fontSize: 17, fontWeight: '700' },
-    headerSub: { color: c.primary, fontSize: 14, fontWeight: '700' },
-    offersBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: c.borderStrong, backgroundColor: c.surface2 },
-    offersBadgeAlert: { borderColor: c.warning, backgroundColor: c.warningSoft },
-    offersBadgeText: { color: c.text, fontSize: 12, fontWeight: '700' },
-    dealBanner: { padding: 14, backgroundColor: c.successSoft, borderBottomWidth: 1, borderBottomColor: c.success },
-    dealTitle: { color: c.success, fontWeight: '800', fontSize: 15 },
-    dealBody: { color: c.textSecondary, fontSize: 13, marginTop: 4, lineHeight: 18 },
-    dealActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-    soldBtn: { backgroundColor: c.success, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 8 },
-    soldBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-    releaseBtn: { borderWidth: 1, borderColor: c.borderStrong, backgroundColor: c.surface, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 8 },
-    releaseBtnText: { color: c.text, fontWeight: '600', fontSize: 13 },
-    infoBar: { padding: 12, backgroundColor: c.surface2, color: c.textSecondary, fontSize: 13, borderBottomWidth: 1, borderBottomColor: c.border },
+    header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 8, backgroundColor: c.surface },
+    headerName: { flexShrink: 1, fontFamily: font.heading, fontSize: 16, color: c.text },
+    headerSub: { fontFamily: font.regular, fontSize: 12, color: c.textMuted },
+    offersBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 32, borderRadius: 8, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface2, marginRight: 4 },
+    offersBadgeAlert: { borderColor: c.warningSoftBorder, backgroundColor: c.warningSoft },
+    offersBadgeText: { color: c.text, fontSize: 12, fontFamily: font.semibold },
+    strip: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 8, padding: 8, borderRadius: 10, backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border },
+    stripThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: c.surface },
+    stripTitle: { fontFamily: font.semibold, fontSize: 14, color: c.text },
+    stripPrice: { fontFamily: font.headingX, fontSize: 16, color: c.text },
+    viewAd: { fontFamily: font.semibold, fontSize: 13, color: c.primaryText, paddingHorizontal: 4 },
+    deal: { margin: 12, marginBottom: 0, padding: 14, borderRadius: 12, backgroundColor: c.successSoft, borderWidth: 1, borderColor: c.successSoftBorder },
+    dealTitle: { fontFamily: font.heading, fontSize: 17, color: c.text },
+    dealBody: { fontFamily: font.regular, fontSize: 13, lineHeight: 18, color: c.textSecondary, marginTop: 2 },
+    reservedPill: { backgroundColor: c.successFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+    reservedText: { color: '#FFFFFF', fontFamily: font.bold, fontSize: 10, letterSpacing: 0.5 },
+    dealActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    infoBar: { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, marginBottom: 0, padding: 12, borderRadius: 10, backgroundColor: c.surface2 },
+    infoText: { flex: 1, fontFamily: font.regular, fontSize: 13, color: c.textSecondary },
+    emptyChat: { fontFamily: font.regular, fontSize: 13, color: c.textMuted, textAlign: 'center', marginTop: 24, paddingHorizontal: 24 },
     eventWrap: { alignItems: 'center', marginVertical: 8 },
-    eventPill: { maxWidth: '90%', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16, backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border },
-    eventText: { color: c.text, fontSize: 13, textAlign: 'center', lineHeight: 18 },
-    eventTime: { color: c.textMuted, fontSize: 11, marginTop: 4 },
-    respond: { color: c.primary, fontWeight: '700' },
-    msgWrapper: { marginBottom: 12, maxWidth: '78%' },
+    eventCard: { width: '88%', flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
+    eventDeal: { width: '100%', backgroundColor: c.successSoft, borderColor: c.successSoftBorder },
+    eventIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    eventLabel: { fontFamily: font.regular, fontSize: 13, color: c.textMuted },
+    eventAmount: { fontFamily: font.headingX, fontSize: 18, color: c.text, marginTop: 1 },
+    eventSub: { fontFamily: font.regular, fontSize: 12, color: c.textSecondary, marginTop: 2 },
+    eventTime: { color: c.textMuted, fontSize: 11, marginTop: 4, fontFamily: font.regular },
+    respond: { color: c.primaryText, fontFamily: font.bold },
+    msgWrapper: { marginBottom: 12, maxWidth: '80%' },
     msgLeft: { alignSelf: 'flex-start' },
     msgRight: { alignSelf: 'flex-end' },
-    bubble: { padding: 12, borderRadius: 16 },
+    bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
     bubbleMe: { backgroundColor: c.primary, borderBottomRightRadius: 4 },
-    bubbleOther: { backgroundColor: c.bubbleOther, borderBottomLeftRadius: 4 },
-    msgText: { color: c.text, fontSize: 15 },
-    msgTextMe: { color: c.onPrimary, fontSize: 15 },
-    timeText: { color: c.textMuted, fontSize: 10, marginTop: 4 },
-    inputContainer: { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.surface },
-    textInput: { flex: 1, backgroundColor: c.inputBg, color: c.text, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, borderWidth: 1, borderColor: c.inputBorder },
-    sendBtn: { marginLeft: 8, backgroundColor: c.primary, borderRadius: 20, paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center' },
-    sendBtnText: { color: c.onPrimary, fontWeight: '700', fontSize: 14 },
-    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: c.overlay },
-    modalCard: { backgroundColor: c.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    modalTitle: { color: c.text, fontSize: 18, fontWeight: '800' },
-    close: { color: c.textSecondary, fontSize: 18 },
-    modalSub: { color: c.textSecondary, fontSize: 14, marginBottom: 16 },
-    emptyOffers: { color: c.textSecondary, textAlign: 'center', padding: 20 },
-    inputLabel: { color: c.textSecondary, fontSize: 13, marginBottom: 6 },
-    input: { backgroundColor: c.inputBg, color: c.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, marginBottom: 14, borderWidth: 1, borderColor: c.inputBorder },
-    submitBtn: { backgroundColor: c.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 4 },
-    submitBtnText: { color: c.onPrimary, fontSize: 16, fontWeight: '700' },
-    offerCard: { backgroundColor: c.surface2, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1 },
+    bubbleOther: { backgroundColor: c.bubbleOther, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: c.border },
+    msgText: { color: c.text, fontSize: 15, lineHeight: 21, fontFamily: font.regular },
+    msgTextMe: { color: c.onPrimary, fontSize: 15, lineHeight: 21, fontFamily: font.regular },
+    timeText: { color: c.textMuted, fontSize: 11, marginTop: 4, fontFamily: font.regular },
+    quick: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 8, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border },
+    quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 32, borderRadius: 999, backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.primarySoftBorder },
+    quickText: { fontFamily: font.semibold, fontSize: 13, color: c.primaryText },
+    composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 10, backgroundColor: c.surface },
+    plus: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' },
+    textInput: { flex: 1, minHeight: 42, maxHeight: 110, backgroundColor: c.surface2, color: c.text, borderRadius: 21, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, fontSize: 15, fontFamily: font.regular, borderWidth: 1, borderColor: c.border },
+    sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.primary, justifyContent: 'center', alignItems: 'center' },
+    modalSub: { fontFamily: font.regular, color: c.textSecondary, fontSize: 14, marginBottom: 16 },
+    emptyOffers: { color: c.textSecondary, textAlign: 'center', padding: 20, fontFamily: font.regular },
+    inputLabel: { fontFamily: font.semibold, color: c.text, fontSize: 13, marginBottom: 6 },
+    amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14, borderWidth: 1, borderColor: c.inputBorder, borderRadius: 10, backgroundColor: c.inputBg, paddingHorizontal: 12 },
+    rupee: { fontFamily: font.heading, fontSize: 22, color: c.textMuted },
+    amountInput: { flex: 1, fontFamily: font.heading, fontSize: 22, color: c.text, paddingVertical: 10 },
+    input: { backgroundColor: c.inputBg, color: c.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: font.regular, marginBottom: 14, borderWidth: 1, borderColor: c.inputBorder },
+    offerCard: { backgroundColor: c.surface2, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: c.border },
     offerCardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-    offerAmount: { fontSize: 18, fontWeight: '800' },
-    offerStatus: { fontSize: 11, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, overflow: 'hidden' },
-    offerMeta: { color: c.textSecondary, fontSize: 12, marginBottom: 4 },
-    offerMsg: { color: c.text, fontSize: 13, fontStyle: 'italic', marginBottom: 4 },
-    offerReply: { color: c.primary, fontSize: 12, marginBottom: 4 },
+    offerAmount: { fontSize: 18, fontFamily: font.headingX, color: c.text },
+    offerMeta: { color: c.textSecondary, fontSize: 12, marginBottom: 4, fontFamily: font.regular },
+    offerMsg: { color: c.text, fontSize: 13, fontStyle: 'italic', marginBottom: 4, fontFamily: font.regular },
+    offerReply: { color: c.primaryText, fontSize: 12, marginBottom: 4, fontFamily: font.medium },
     offerActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-    offerActionBtn: { flex: 1, paddingVertical: 9, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-    offerActionText: { fontWeight: '700', fontSize: 13 },
   });

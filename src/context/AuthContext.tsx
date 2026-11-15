@@ -8,6 +8,10 @@ export interface UserProfile {
   phone?: string | null;
   status: string;
   role: string;
+  userCode?: string;
+  emailVerifiedAt?: string | null;
+  phoneVerifiedAt?: string | null;
+  createdAt?: string;
 }
 
 interface AuthContextType {
@@ -16,6 +20,9 @@ interface AuthContextType {
   isVerified: boolean;
   login: (tokens: AuthTokens, user: UserProfile) => Promise<void>;
   logout: () => Promise<void>;
+  /** Re-reads GET /users/me (e.g. after editing the profile). */
+  refreshUser: () => Promise<void>;
+  setUser: (user: UserProfile) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -24,6 +31,8 @@ const AuthContext = createContext<AuthContextType>({
   isVerified: false,
   login: async () => {},
   logout: async () => {},
+  refreshUser: async () => {},
+  setUser: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -61,8 +70,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const res = await fetchApi<UserProfile>('/users/me');
+    if (res.success && res.data) setUser(res.data);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, isVerified: user?.status === 'ACTIVE', login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isVerified: user?.status === 'ACTIVE', login, logout, refreshUser, setUser }}>
       {children}
     </AuthContext.Provider>
   );

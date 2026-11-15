@@ -15,32 +15,42 @@ export interface AppNotification {
 
 interface NotificationsContextValue {
   unreadCount: number;
+  /** Conversations whose latest message is from the other person and not yet read. */
+  unreadChats: number;
   refresh: () => void;
 }
 
 const POLL_MS = 20_000;
-const NotificationsContext = createContext<NotificationsContextValue>({ unreadCount: 0, refresh: () => {} });
+const NotificationsContext = createContext<NotificationsContextValue>({ unreadCount: 0, unreadChats: 0, refresh: () => {} });
 
 /** Where tapping a notification should go: [screen, params]. */
 export function notificationTarget(n: AppNotification): [string, object | undefined] {
   if (n.data?.conversationId) return ['ChatDetail', { conversationId: n.data.conversationId }];
   if (n.data?.listingId) return ['ProductDetails', { listingId: n.data.listingId }];
-  return ['Home', undefined];
+  return ['Tabs', { screen: 'Home' }];
 }
 
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!user) return;
-    const res = await fetchApi<{ unreadCount: number }>('/notifications/unread-count');
-    if (res.success && res.data) setUnreadCount(res.data.unreadCount);
+    const [count, chats] = await Promise.all([
+      fetchApi<{ unreadCount: number }>('/notifications/unread-count'),
+      fetchApi<{ messages: { senderId: string; isRead?: boolean }[] }[]>('/conversations'),
+    ]);
+    if (count.success && count.data) setUnreadCount(count.data.unreadCount);
+    if (chats.success && chats.data) {
+      setUnreadChats(chats.data.filter((c) => c.messages?.[0] && c.messages[0].senderId !== user.id && c.messages[0].isRead === false).length);
+    }
   }, [user]);
 
   useEffect(() => {
     if (!user) {
       setUnreadCount(0);
+      setUnreadChats(0);
       return;
     }
     void refresh();
@@ -62,7 +72,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user, refresh]);
 
   return (
-    <NotificationsContext.Provider value={{ unreadCount, refresh: () => void refresh() }}>
+    <NotificationsContext.Provider value={{ unreadCount, unreadChats, refresh: () => void refresh() }}>
       {children}
     </NotificationsContext.Provider>
   );
