@@ -19,6 +19,7 @@ interface ListingItem {
   cityCode: string;
   media: { url: string }[];
   category: { name: string };
+  verifiedAt?: string | null;
 }
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -123,6 +124,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 <View style={styles.cardBody}>
                   <Text style={styles.catText}>{item.category?.name || 'General'}</Text>
                   <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
+                  {item.verifiedAt ? <Text style={{ color: colors.success, fontSize: 11, fontWeight: '700' }}>✓ Verified</Text> : null}
                   <Text style={styles.itemPrice}>{formatPrice(item.price)}</Text>
                 </View>
               </TouchableOpacity>

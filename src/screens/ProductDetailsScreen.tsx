@@ -20,6 +20,7 @@ interface ListingDetail {
   price: number;
   condition: string;
   status: string;
+  verifiedAt?: string | null;
   cityCode: string;
   stateCode: string;
   createdAt: string;
@@ -224,6 +225,7 @@ export const ProductDetailsScreen: React.FC<{ route: any; navigation: any }> = (
             <Text style={styles.conditionBadge}>{CONDITION_LABELS[listing.condition] ?? listing.condition}</Text>
           </View>
           <Text style={styles.title}>{listing.title}</Text>
+          {listing.verifiedAt ? <Text style={styles.verified}>✓ Verified by Becho</Text> : null}
           <Text style={styles.price}>{formatPrice(listing.price)}</Text>
           <Text style={styles.location}>📍 {listing.cityCode}, {listing.stateCode} (approximate)</Text>
         </View>
@@ -312,6 +314,7 @@ const makeStyles = (c: Colors) =>
     categoryBadge: { backgroundColor: c.primarySoft, color: c.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, fontWeight: '600', overflow: 'hidden' },
     conditionBadge: { backgroundColor: c.surface2, color: c.textSecondary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontSize: 12, overflow: 'hidden' },
     title: { fontSize: 22, fontWeight: '700', color: c.text, marginBottom: 8 },
+    verified: { color: c.success, fontWeight: '700', fontSize: 13, marginBottom: 6 },
     price: { fontSize: 28, fontWeight: '800', color: c.primary, marginBottom: 8 },
     location: { color: c.textSecondary, fontSize: 14 },
     sectionCard: { backgroundColor: c.surface, padding: 16, borderRadius: 16, marginBottom: 16 },

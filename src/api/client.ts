@@ -10,6 +10,8 @@ export interface ApiResponse<T = any> {
   error?: {
     code: string;
     message: string;
+    /** Per-field validation messages, e.g. [{ path: 'email', message: '…' }]. */
+    details?: { path: string; message: string }[];
   };
 }
 

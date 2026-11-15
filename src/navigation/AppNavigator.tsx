@@ -10,6 +10,7 @@ import { ProductDetailsScreen } from '../screens/ProductDetailsScreen';
 import { ConversationsScreen } from '../screens/ConversationsScreen';
 import { ChatDetailScreen } from '../screens/ChatDetailScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   Conversations: undefined;
   ChatDetail: { conversationId: string };
   Notifications: undefined;
+  ForgotPassword: { identifier?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -39,6 +41,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="Conversations" component={ConversationsScreen} />
         <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
