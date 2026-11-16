@@ -25,6 +25,6 @@ export const NotificationBell: React.FC<{ onPress: () => void }> = ({ onPress })
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    badge: { position: 'absolute', top: 3, right: 2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, backgroundColor: c.danger, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: c.surface },
+    badge: { position: 'absolute', top: 3, right: 2, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: c.surface },
     badgeText: { color: '#fff', fontSize: 9, fontFamily: font.bold },
   });

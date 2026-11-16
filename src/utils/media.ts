@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as LegacyFS from 'expo-file-system/legacy';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { fetchApi } from '../api/client';
@@ -31,6 +32,18 @@ const MAX_IMAGE_DIMENSION = 1600;
 
 /** Resizes a photo to at most 1600px on the long side and re-encodes it as JPEG (~200–500 KB). */
 export async function compressImage(uri: string, width?: number, height?: number): Promise<string> {
+  if (Platform.OS === 'web') {
+    // Web preview: resizing is best-effort; the original file is uploaded if the browser can't do it.
+    try {
+      return await compressNative(uri, width, height);
+    } catch {
+      return uri;
+    }
+  }
+  return compressNative(uri, width, height);
+}
+
+async function compressNative(uri: string, width?: number, height?: number): Promise<string> {
   const ctx = ImageManipulator.manipulate(uri);
   if (width && height && Math.max(width, height) > MAX_IMAGE_DIMENSION) {
     ctx.resize(width >= height ? { width: MAX_IMAGE_DIMENSION } : { height: MAX_IMAGE_DIMENSION });
@@ -41,6 +54,8 @@ export async function compressImage(uri: string, width?: number, height?: number
 }
 
 export async function fileSize(uri: string): Promise<number> {
+  // expo-file-system has no web implementation; the web preview reads the blob instead.
+  if (Platform.OS === 'web') return (await (await fetch(uri)).blob()).size;
   const info = await LegacyFS.getInfoAsync(uri);
   return info.exists && 'size' in info && typeof info.size === 'number' ? info.size : 0;
 }
@@ -69,6 +84,12 @@ export async function uploadMedia(
   });
   if (!ticket.success || !ticket.data) throw new Error(ticket.error?.message || 'Could not start the upload');
 
+  if (Platform.OS === 'web') {
+    await putBlobWeb(ticket.data.uploadUrl, uri, ticket.data.headers, onProgress);
+    onProgress(1);
+    return ticket.data.uploadId;
+  }
+
   const task = LegacyFS.createUploadTask(
     ticket.data.uploadUrl,
     uri,
@@ -81,4 +102,18 @@ export async function uploadMedia(
   }
   onProgress(1);
   return ticket.data.uploadId;
+}
+
+/** Web preview only: PUT the picked file (a blob: or data: URI) with progress via XHR. */
+async function putBlobWeb(url: string, uri: string, headers: Record<string, string>, onProgress: (fraction: number) => void) {
+  const blob = await (await fetch(uri)).blob();
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status}). Check your connection and try again.`)));
+    xhr.onerror = () => reject(new Error('Upload failed. Check your connection and try again.'));
+    xhr.send(blob);
+  });
 }

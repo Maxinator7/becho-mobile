@@ -451,7 +451,7 @@ const makeStyles = (c: Colors) =>
     priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     rupeeBox: { width: 48, height: 56, borderRadius: 10, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border },
     rupee: { fontFamily: font.heading, fontSize: 22, color: c.text },
-    priceInput: { flex: 1, height: 56, borderRadius: 10, borderWidth: 1, borderColor: c.inputBorder, backgroundColor: c.inputBg, paddingHorizontal: 14, fontFamily: font.headingX, fontSize: 26, color: c.text },
+    priceInput: { flex: 1, minWidth: 0, width: '100%', height: 56, borderRadius: 10, borderWidth: 1, borderColor: c.inputBorder, backgroundColor: c.inputBg, paddingHorizontal: 14, fontFamily: font.headingX, fontSize: 26, color: c.text },
     hint: { color: c.textMuted, fontSize: 12, marginTop: 8, fontFamily: font.regular, lineHeight: 17 },
     footer: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border },
   });

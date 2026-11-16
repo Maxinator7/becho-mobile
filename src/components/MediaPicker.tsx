@@ -128,19 +128,22 @@ export const MediaPicker: React.FC<Props> = ({ items, onChange, limits }) => {
         <Text style={styles.headTitle}>Photos & video</Text>
         <Text style={styles.headCount}>{total} / {maxTotal} items</Text>
       </View>
-      <TouchableOpacity style={styles.dropTile} onPress={pickFromLibrary} accessibilityRole="button" accessibilityLabel="Add photos or a video from your gallery">
-        <View style={styles.dropIcon}>
-          <Icon name="camera-plus-outline" size={24} color={colors.primaryText} />
-        </View>
-        <Text style={styles.dropTitle}>Add photos (up to {limits.maxImagesPerListing}) & {limits.maxVideosPerListing} video</Text>
-        <Text style={styles.dropSub}>
-          Video up to {limits.maxVideoSeconds}s and {formatMB(limits.maxVideoBytes)}. The first photo is the cover.
-        </Text>
+      {/* Camera button sits beside the gallery touchable (not inside it) so web never nests buttons. */}
+      <View style={styles.dropTile}>
+        <TouchableOpacity style={styles.dropMain} onPress={pickFromLibrary} accessibilityRole="button" accessibilityLabel="Add photos or a video from your gallery">
+          <View style={styles.dropIcon}>
+            <Icon name="camera-plus-outline" size={24} color={colors.primaryText} />
+          </View>
+          <Text style={styles.dropTitle}>Add photos (up to {limits.maxImagesPerListing}) & {limits.maxVideosPerListing} video</Text>
+          <Text style={styles.dropSub}>
+            Video up to {limits.maxVideoSeconds}s and {formatMB(limits.maxVideoBytes)}. The first photo is the cover.
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.cameraBtn} onPress={takePhoto} accessibilityRole="button" accessibilityLabel="Take a photo with the camera">
           <Icon name="camera-outline" size={16} color={colors.primaryText} />
           <Text style={styles.cameraText}>Take a photo</Text>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
       {notice && <Text style={styles.notice}>{notice}</Text>}
 
       {items.length > 0 && (
@@ -189,6 +192,7 @@ const makeStyles = (c: Colors) =>
     headRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 },
     headTitle: { fontFamily: font.heading, fontSize: 17, color: c.text },
     headCount: { fontFamily: font.semibold, fontSize: 12, color: c.textMuted },
+    dropMain: { alignItems: 'center', alignSelf: 'stretch' },
     dropTile: { alignItems: 'center', paddingVertical: 18, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.borderStrong, backgroundColor: c.surface },
     dropIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
     dropTitle: { fontFamily: font.semibold, fontSize: 14, color: c.text, textAlign: 'center' },

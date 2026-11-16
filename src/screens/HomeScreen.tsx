@@ -17,6 +17,7 @@ import { TopBar } from '../components/TopBar';
 import { ListingCard, ListingSummary } from '../components/ListingCard';
 import { Button, EmptyState, Icon, SectionTitle } from '../components/ui';
 import { useCity } from '../context/CityContext';
+import { useAuth } from '../context/AuthContext';
 import { categoryIcon, useCategories, useServiceAreas } from '../utils/catalog';
 import { Colors, font, useTheme, useThemedStyles } from '../theme/ThemeContext';
 
@@ -36,11 +37,14 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [failed, setFailed] = useState(false);
   const [search, setSearch] = useState('');
 
-  const cardWidth = (Math.min(width, 640) - PAD * 2 - GAP) / 2;
+  const fullWidth = Math.min(width, 640) - PAD * 2;
+  const cardWidth = (fullWidth - GAP) / 2;
+  const catWidth = (fullWidth - 10 * 2) / 3;
+  const { user } = useAuth();
   const cityLabel = area?.cityName ?? 'your area';
 
   const load = useCallback(async () => {
-    let url = '/listings?limit=20';
+    let url = '/listings?limit=21';
     if (area) url += `&countryCode=${area.countryCode}&cityCode=${area.cityCode}`;
     const res = await fetchApi<{ listings: ListingSummary[] }>(url);
     setLoading(false);
@@ -100,7 +104,6 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
               >
-                {selected && <Icon name="navigation-variant-outline" size={14} color={colors.onChipSelected} />}
                 <Text style={[styles.cityChipText, selected && { color: colors.onChipSelected }]}>{a?.cityName ?? 'All cities'}</Text>
                 {selected && <Icon name="check" size={14} color={colors.onChipSelected} />}
               </TouchableOpacity>
@@ -110,59 +113,67 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
         {/* Trust banner */}
         <View style={styles.trust}>
-          <View style={styles.trustIcon}>
-            <Icon name="shield-check-outline" size={22} color={colors.success} />
-          </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.trustTitle}>Verified people only</Text>
-            <Text style={styles.trustBody}>Every buyer and seller confirms their email before they can chat or sell.</Text>
+            <Text style={styles.trustTitle}>Trust in every deal</Text>
+            <Text style={styles.trustBody}>Buy and sell locally with people who have verified their email.</Text>
+            <TouchableOpacity
+              style={styles.trustLinkRow}
+              onPress={() =>
+                Alert.alert(
+                  'How Becho keeps trading safe',
+                  'Everyone confirms their email address before they can chat, make offers or post ads.\n\nListings marked "Verified by Becho" have been checked by our team. Keep chats and offers inside the app.'
+                )
+              }
+              accessibilityRole="button"
+              hitSlop={8}
+            >
+              <Text style={styles.trustLink}>Learn more</Text>
+              <Icon name="arrow-right" size={16} color={colors.primaryText} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert(
-                'How Becho keeps trading safe',
-                'Everyone confirms their email address before they can chat, make offers or post ads.\n\nListings with a VERIFIED badge have been checked by the Becho team. Chats and offers stay inside the app.'
-              )
-            }
-            accessibilityRole="button"
-            hitSlop={8}
-          >
-            <Text style={styles.trustLink}>Know more ›</Text>
-          </TouchableOpacity>
+          <View style={styles.trustIcon}>
+            <Icon name="account-group-outline" size={24} color={colors.primaryText} />
+          </View>
         </View>
 
         {/* Categories */}
-        <SectionTitle title="Categories" action="Explore all" onAction={() => openExplore()} style={{ marginTop: 24 }} />
+        <SectionTitle title="Categories" action="See all" onAction={() => openExplore()} style={{ marginTop: 24 }} />
         <View style={styles.catGrid}>
-          {categories.slice(0, 7).map((cat) => (
-            <TouchableOpacity key={cat.id} style={[styles.catTile, { width: (Math.min(width, 640) - PAD * 2 - 8 * 3) / 4 }]} onPress={() => openExplore({ categoryId: cat.id })} accessibilityRole="button" accessibilityLabel={cat.name}>
+          {categories.slice(0, 6).map((cat) => (
+            <TouchableOpacity key={cat.id} style={[styles.catTile, { width: catWidth }]} onPress={() => openExplore({ categoryId: cat.id })} accessibilityRole="button" accessibilityLabel={cat.name}>
               <View style={styles.catIcon}>
                 <Icon name={categoryIcon(cat.slug)} size={22} color={colors.primaryText} />
               </View>
-              <Text style={styles.catLabel} numberOfLines={1}>{cat.name.split(' ')[0].replace(/,$/, '')}</Text>
+              <Text style={styles.catLabel} numberOfLines={1}>{cat.name}</Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity style={[styles.catTile, { width: (Math.min(width, 640) - PAD * 2 - 8 * 3) / 4 }]} onPress={() => openExplore()} accessibilityRole="button" accessibilityLabel="All categories">
-            <View style={styles.catIcon}>
-              <Icon name="view-grid-outline" size={22} color={colors.primaryText} />
-            </View>
-            <Text style={styles.catLabel}>All</Text>
-          </TouchableOpacity>
+          {categories.length > 0 && categories.length < 6 && (
+            <TouchableOpacity style={[styles.catTile, { width: catWidth }]} onPress={() => openExplore()} accessibilityRole="button" accessibilityLabel="All categories">
+              <View style={styles.catIcon}>
+                <Icon name="view-grid-outline" size={22} color={colors.primaryText} />
+              </View>
+              <Text style={styles.catLabel}>All categories</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Promo: staff-verified listings */}
-        <View style={styles.promo}>
-          <View style={styles.promoOverlineRow}>
-            <Icon name="check-decagram-outline" size={14} color="#A5B4FC" />
-            <Text style={styles.promoOverline}>STAFF VERIFIED</Text>
+        {/* Sell prompt */}
+        <View style={styles.sell}>
+          <View style={styles.sellIcon}>
+            <Icon name="image-plus" size={20} color={colors.onPrimary} />
           </View>
-          <Text style={styles.promoTitle}>Shop listings checked by the Becho team</Text>
-          <Text style={styles.promoBody}>Look for the green VERIFIED badge, or show only verified ads.</Text>
-          <Button title="Show verified ads" size="sm" onPress={() => openExplore({ verified: true })} style={{ alignSelf: 'flex-start', marginTop: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sellTitle}>Looking to sell?</Text>
+            <Text style={styles.sellBody}>Posting an ad is free</Text>
+          </View>
+          <Button title="Post Ad" size="sm" onPress={() => navigation.navigate(user ? 'CreateListing' : 'Login')} />
         </View>
 
         {/* Listings */}
-        <SectionTitle title={`Trending in ${area?.cityName ?? 'India'}`} subtitle="Newest live listings first" style={{ marginTop: 24 }} />
+        <View style={styles.freshRow}>
+          <Text style={styles.freshTitle} accessibilityRole="header">Fresh recommendations</Text>
+          <Text style={styles.freshCity}>{area?.cityName ?? 'All cities'}</Text>
+        </View>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginVertical: 32 }} />
         ) : listings.length === 0 ? (
@@ -173,9 +184,13 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           />
         ) : (
           <View style={styles.grid}>
-            {listings.map((l) => (
-              <ListingCard key={l.id} listing={l} width={cardWidth} onPress={() => openListing(l.id)} onNeedLogin={() => navigation.navigate('Login')} />
-            ))}
+            {listings.map((l, i) => {
+              // An odd last card spans the full width, like the Stitch layout.
+              const wide = i === listings.length - 1 && listings.length % 2 === 1;
+              return (
+                <ListingCard key={l.id} listing={l} wide={wide} width={wide ? fullWidth : cardWidth} onPress={() => openListing(l.id)} onNeedLogin={() => navigation.navigate('Login')} />
+              );
+            })}
           </View>
         )}
 
@@ -195,27 +210,30 @@ const makeStyles = (c: Colors) =>
     container: { flex: 1, backgroundColor: c.bg },
     scroll: { padding: PAD, paddingBottom: 32 },
     searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, borderRadius: 999, paddingHorizontal: 14, backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border },
+    search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, borderRadius: 12, paddingHorizontal: 14, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
     searchInput: { flex: 1, fontFamily: font.regular, fontSize: 15, color: c.text, paddingVertical: 0 },
-    filterBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
+    filterBtn: { width: 48, height: 48, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' },
     chips: { gap: 8, paddingVertical: 12 },
-    cityChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 34, borderRadius: 999, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
+    cityChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 36, borderRadius: 10, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
     cityChipSelected: { backgroundColor: c.chipSelected, borderColor: c.chipSelected },
     cityChipText: { fontFamily: font.medium, fontSize: 13, color: c.text },
-    trust: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, backgroundColor: c.successSoft, borderWidth: 1, borderColor: c.successSoftBorder },
-    trustIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
-    trustTitle: { fontFamily: font.heading, fontSize: 15, color: c.text },
-    trustBody: { fontFamily: font.regular, fontSize: 12, lineHeight: 17, color: c.textSecondary, marginTop: 2 },
-    trustLink: { fontFamily: font.semibold, fontSize: 13, color: c.primaryText },
-    catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    catTile: { aspectRatio: 1, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', gap: 6, padding: 4 },
-    catIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' },
-    catLabel: { fontFamily: font.medium, fontSize: 12, color: c.text },
-    promo: { marginTop: 24, padding: 16, borderRadius: 12, backgroundColor: c.surfaceDeep, borderWidth: 1, borderColor: c.border },
-    promoOverlineRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    promoOverline: { fontFamily: font.semibold, fontSize: 11, letterSpacing: 0.7, color: '#A5B4FC' },
-    promoTitle: { fontFamily: font.heading, fontSize: 18, lineHeight: 24, color: c.onSurfaceDeep, marginTop: 6 },
-    promoBody: { fontFamily: font.regular, fontSize: 13, color: '#94A3B8', marginTop: 4 },
+    trust: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 16, borderRadius: 14, backgroundColor: c.tint, borderWidth: 1, borderColor: c.primarySoftBorder },
+    trustIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    trustTitle: { fontFamily: font.heading, fontSize: 19, color: c.primaryText },
+    trustBody: { fontFamily: font.regular, fontSize: 13, lineHeight: 18, color: c.textSecondary, marginTop: 4 },
+    trustLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, alignSelf: 'flex-start' },
+    trustLink: { fontFamily: font.semibold, fontSize: 14, color: c.primaryText },
+    catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    catTile: { height: 92, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 6 },
+    catIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    catLabel: { fontFamily: font.medium, fontSize: 12, color: c.text, textAlign: 'center' },
+    sell: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 24, padding: 14, borderRadius: 14, backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.primarySoftBorder },
+    sellIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' },
+    sellTitle: { fontFamily: font.semibold, fontSize: 15, color: c.text },
+    sellBody: { fontFamily: font.regular, fontSize: 13, color: c.textSecondary, marginTop: 1 },
+    freshRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 28, marginBottom: 12 },
+    freshTitle: { flex: 1, fontFamily: font.heading, fontSize: 21, color: c.text },
+    freshCity: { fontFamily: font.medium, fontSize: 13, color: c.textMuted },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
     more: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 20, height: 48, borderRadius: 12, backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.primarySoftBorder },
     moreText: { fontFamily: font.heading, fontSize: 15, color: c.primaryText },

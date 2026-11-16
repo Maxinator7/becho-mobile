@@ -21,6 +21,7 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { SavedAdsScreen } from '../screens/SavedAdsScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
+import { VerifyEmailScreen } from '../screens/VerifyEmailScreen';
 
 export type TabParamList = {
   Home: undefined;
@@ -42,6 +43,7 @@ export type RootStackParamList = {
   ForgotPassword: { identifier?: string } | undefined;
   SavedAds: undefined;
   ChangePassword: undefined;
+  VerifyEmail: { email?: string; devOtp?: string; sent?: boolean } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -49,7 +51,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 const TAB_ICONS: Record<keyof TabParamList, [IconName, IconName]> = {
   Home: ['home-variant-outline', 'home-variant'],
-  Explore: ['magnify', 'magnify'],
+  Explore: ['compass-outline', 'compass'],
   Sell: ['plus', 'plus'],
   Chats: ['chat-outline', 'chat'],
   Account: ['account-outline', 'account'],
@@ -151,6 +153,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -166,7 +169,7 @@ const makeStyles = (c: Colors) =>
     fab: {
       width: 56,
       height: 56,
-      borderRadius: 28,
+      borderRadius: 18,
       marginTop: -28,
       backgroundColor: c.primary,
       alignItems: 'center',
@@ -179,6 +182,6 @@ const makeStyles = (c: Colors) =>
       shadowOffset: { width: 0, height: 4 },
       elevation: 6,
     },
-    badge: { position: 'absolute', top: -4, right: -9, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: c.surface },
+    badge: { position: 'absolute', top: -4, right: -9, minWidth: 17, height: 17, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: c.surface },
     badgeText: { color: '#fff', fontSize: 9, fontFamily: font.bold },
   });

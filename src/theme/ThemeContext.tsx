@@ -41,42 +41,53 @@ export interface Colors {
   onChipSelected: string;
   /** "Deal" buttons: dark slate in light mode, green in dark mode. */
   strongButton: string;
+  /** Purple accent (reserved deals, notification dot, "Confirm sale"). */
+  accent: string;
+  /** Accent as text/icon colour on accentSoft or the page background. */
+  accentText: string;
+  accentSoft: string;
+  /** Lavender fill for tiles, icon wells and filled inputs. */
+  tint: string;
 }
 
 const light: Colors = {
-  bg: '#F8FAFC',
+  bg: '#FAF8FF',
   surface: '#FFFFFF',
-  surface2: '#F1F5F9',
-  surfaceDeep: '#0F172A',
-  onSurfaceDeep: '#F8FAFC',
-  border: '#E2E8F0',
-  borderStrong: '#CBD5E1',
-  text: '#0F172A',
-  textSecondary: '#475569',
-  textMuted: '#64748B',
-  primary: '#4F46E5',
-  primaryText: '#4338CA',
-  primarySoft: '#EEF2FF',
-  primarySoftBorder: '#C7D2FE',
+  surface2: '#F2F3FF',
+  surfaceDeep: '#1F108E',
+  onSurfaceDeep: '#FFFFFF',
+  border: '#E4E2F2',
+  borderStrong: '#C8C4D5',
+  text: '#131B2E',
+  textSecondary: '#464553',
+  textMuted: '#636272',
+  primary: '#3730A3',
+  primaryText: '#2A1F9E',
+  primarySoft: '#E2DFFF',
+  primarySoftBorder: '#C3C0FF',
   onPrimary: '#FFFFFF',
   success: '#047857',
   successFill: '#059669',
-  successSoft: '#ECFDF5',
+  successSoft: '#E7F8F0',
   successSoftBorder: '#A7F3D0',
   warning: '#B45309',
   warningSoft: '#FFFBEB',
   warningSoftBorder: '#FDE68A',
-  danger: '#E11D48',
-  dangerSoft: '#FFF1F2',
-  dangerSoftBorder: '#FECDD3',
-  inputBg: '#FFFFFF',
-  inputBorder: '#CBD5E1',
-  placeholder: '#94A3B8',
-  overlay: 'rgba(15,23,42,0.45)',
+  danger: '#BA1A1A',
+  dangerSoft: '#FFEDEA',
+  dangerSoftBorder: '#FFDAD6',
+  inputBg: '#F2F3FF',
+  inputBorder: '#DCDAEC',
+  placeholder: '#8A889A',
+  overlay: 'rgba(19,27,46,0.45)',
   bubbleOther: '#FFFFFF',
-  chipSelected: '#0F172A',
+  chipSelected: '#2A1F9E',
   onChipSelected: '#FFFFFF',
-  strongButton: '#0F172A',
+  strongButton: '#059669',
+  accent: '#8127CF',
+  accentText: '#7A1FC7',
+  accentSoft: '#F3E6FF',
+  tint: '#EAEDFF',
 };
 
 const dark: Colors = {
@@ -113,6 +124,10 @@ const dark: Colors = {
   chipSelected: '#6366F1',
   onChipSelected: '#FFFFFF',
   strongButton: '#059669',
+  accent: '#9333EA',
+  accentText: '#D8B4FE',
+  accentSoft: 'rgba(168,85,247,0.18)',
+  tint: 'rgba(99,102,241,0.14)',
 };
 
 /** Font families loaded in App.tsx (Inter for UI, Plus Jakarta Sans for headings). */

@@ -80,6 +80,37 @@ const OFFER_STATUS: Record<string, { label: string; tone: Tone }> = {
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
 
+/** TODAY / YESTERDAY / 12 NOV for the day separators. */
+function dayLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(Date.now() - 86_400_000);
+  if (d.toDateString() === today.toDateString()) return 'TODAY';
+  if (d.toDateString() === yesterday.toDateString()) return 'YESTERDAY';
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }).toUpperCase();
+}
+
+/** Rounded amounts between two prices, used as one-tap suggestions in the offer sheets. */
+function suggestions(from: number, to: number, exclude: number[]): number[] {
+  const lo = Math.min(from, to);
+  const hi = Math.max(from, to);
+  const step = hi >= 20000 ? 500 : hi >= 2000 ? 100 : 10;
+  const out = new Set<number>();
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    const v = Math.round((lo + (hi - lo) * f) / step) * step;
+    if (v > 0 && !exclude.includes(v)) out.add(v);
+  }
+  return [...out].slice(0, 4);
+}
+
+/** Rounds a suggested amount to a friendly step (₹500 / ₹100 / ₹10). */
+const roundAmount = (v: number) => {
+  const step = v >= 20000 ? 500 : v >= 2000 ? 100 : 10;
+  return Math.max(step, Math.round(v / step) * step);
+};
+
+type Row = MessageItem | { id: string; kind: 'DAY'; label: string };
+
 export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { conversationId } = route.params;
   const { user } = useAuth();
@@ -168,7 +199,7 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
 
   const handleOpenCounter = (offer: Offer) => {
     setCounterTargetOffer(offer);
-    setCounterAmount(String(Math.round(offer.amount * 1.05)));
+    setCounterAmount(String(roundAmount(Number(offer.amount) * 1.05)));
     setCounterMessage('');
     setShowOffersModal(false);
     setShowCounterModal(true);
@@ -239,9 +270,29 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
   const other = meta ? (iAmSeller ? meta.buyer : meta.seller) : null;
   const canMakeOffer = !iAmSeller && listingStatus === 'LIVE' && pendingOffers.length === 0;
 
+  const rows: Row[] = [];
+  let lastDay = '';
+  for (const m of messages) {
+    const label = dayLabel(m.createdAt);
+    if (label !== lastDay) {
+      rows.push({ id: `day-${m.id}`, kind: 'DAY', label });
+      lastDay = label;
+    }
+    rows.push(m);
+  }
+  const theirPending = pendingOffers.find((o) => o.proposedById !== user?.id);
+  const savedAmount = acceptedOffer && meta ? Number(meta.listing.price) - Number(acceptedOffer.amount) : 0;
+  const sheetSuggestions = showNewOffer && meta
+    ? suggestions(Number(meta.listing.price) * 0.85, Number(meta.listing.price) * 0.95, [])
+    : counterTargetOffer && meta
+      ? iAmSeller
+        ? suggestions(Number(counterTargetOffer.amount), Number(meta.listing.price), [Number(counterTargetOffer.amount)])
+        : suggestions(Number(counterTargetOffer.amount) * 0.9, Number(counterTargetOffer.amount), [Number(counterTargetOffer.amount)])
+      : [];
+
   const openNewOffer = () => {
     if (!meta) return;
-    setCounterAmount(String(Math.floor(meta.listing.price * 0.9)));
+    setCounterAmount(String(roundAmount(Number(meta.listing.price) * 0.9)));
     setCounterMessage('');
     setShowNewOffer(true);
   };
@@ -263,7 +314,15 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
     );
   }
 
-  const renderMessage = ({ item }: { item: MessageItem }) => {
+  const renderMessage = ({ item: row }: { item: Row }) => {
+    if (row.kind === 'DAY') {
+      return (
+        <View style={styles.dayWrap}>
+          <Text style={styles.dayText}>{row.label}</Text>
+        </View>
+      );
+    }
+    const item = row;
     const isMe = item.senderId === user?.id;
     if (item.kind === 'EVENT') {
       const event = item.metadata?.event ?? '';
@@ -273,21 +332,36 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
       const canRespond = !isMe && offer?.status === 'PENDING';
       const isDeal = event === 'OFFER_ACCEPTED';
       const status = (event === 'OFFER_MADE' || event === 'OFFER_COUNTERED') && offer ? OFFER_STATUS[offer.status] : null;
+      if (isDeal && meta) {
+        return (
+          <View style={styles.eventWrap}>
+            <View style={styles.dealEvent}>
+              <View style={styles.dealEventIcon}>
+                <Icon name="shield-check-outline" size={22} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dealEventTitle}>Offer accepted{item.metadata?.amount != null ? `: ${formatPrice(item.metadata.amount)}` : ''}</Text>
+                <Text style={styles.dealEventSub}>Deal agreed between {meta.buyer.displayName.split(' ')[0]} and {meta.seller.displayName.split(' ')[0]}.</Text>
+              </View>
+            </View>
+            <Text style={styles.eventTime}>{time(item.createdAt)}</Text>
+          </View>
+        );
+      }
       return (
         <View style={styles.eventWrap}>
-          <View style={[styles.eventCard, isDeal && styles.eventDeal]}>
-            <View style={[styles.eventIcon, isDeal && { backgroundColor: colors.surface }]}>
-              <Icon name={def?.icon ?? 'information-outline'} size={18} color={isDeal ? colors.success : colors.primaryText} />
+          <TouchableOpacity style={styles.eventCard} disabled={!offer} onPress={() => setShowOffersModal(true)} accessibilityRole="button">
+            <View style={styles.eventIcon}>
+              <Icon name={def?.icon ?? 'information-outline'} size={18} color={colors.primaryText} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.eventLabel, isDeal && { color: colors.success, fontFamily: font.semibold }]}>
+              <Text style={styles.eventLabel}>
                 {def ? `${who} ${def.verb}` : isMe && item.sender ? item.content.replace(item.sender.displayName, 'You') : item.content}
               </Text>
               {item.metadata?.amount != null && <Text style={styles.eventAmount}>{formatPrice(item.metadata.amount)}</Text>}
-              {isDeal && <Text style={styles.eventSub}>The item is reserved — agree a time and place to meet.</Text>}
             </View>
             {status && <Chip label={status.label} tone={status.tone} uppercase={false} />}
-          </View>
+          </TouchableOpacity>
           <Text style={styles.eventTime}>
             {time(item.createdAt)}
             {canRespond ? '  ·  ' : ''}
@@ -317,6 +391,15 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
               <IconButton name="close" label="Close" onPress={onClose} />
             </View>
             {sub}
+            {sheetSuggestions.length > 0 && (
+              <View style={styles.suggestRow}>
+                {sheetSuggestions.map((v) => (
+                  <TouchableOpacity key={v} style={[styles.suggest, counterAmount === String(v) && styles.suggestOn]} onPress={() => setCounterAmount(String(v))} accessibilityRole="button" accessibilityLabel={`Use ${formatPrice(v)}`}>
+                    <Text style={[styles.suggestText, counterAmount === String(v) && { color: colors.onPrimary }]}>{formatPrice(v)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
             <Text style={styles.inputLabel}>Amount</Text>
             <View style={styles.amountRow}>
               <Text style={styles.rupee}>₹</Text>
@@ -432,13 +515,16 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
             )}
             <View style={{ flex: 1 }}>
               <Text style={styles.stripTitle} numberOfLines={1}>{meta.listing.title}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
                 <Text style={styles.stripPrice}>{formatPrice(meta.listing.price)}</Text>
-                {listingStatus && listingStatus !== 'LIVE' && <Chip label={listingStatus === 'RESERVED' ? 'Reserved' : listingStatus === 'SOLD' ? 'Sold' : 'Unavailable'} tone={listingStatus === 'RESERVED' ? 'primary' : 'neutral'} />}
+                <Text style={styles.stripListed}>Listed</Text>
+                {listingStatus && listingStatus !== 'LIVE' && !(listingStatus === 'RESERVED' && acceptedOffer) && <Chip label={listingStatus === 'RESERVED' ? 'Reserved' : listingStatus === 'SOLD' ? 'Sold' : 'Unavailable'} tone={listingStatus === 'RESERVED' ? 'primary' : 'neutral'} />}
               </View>
+              <Text style={styles.stripSeller} numberOfLines={1}>Seller: {meta.seller.displayName}</Text>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('ProductDetails', { listingId: meta.listingId })} accessibilityRole="button" hitSlop={8}>
-              <Text style={styles.viewAd}>View ad</Text>
+            <TouchableOpacity style={styles.viewAd} onPress={() => navigation.navigate('ProductDetails', { listingId: meta.listingId })} accessibilityRole="button" hitSlop={8}>
+              <Text style={styles.viewAdText}>View ad</Text>
+              <Icon name="open-in-new" size={14} color={colors.primaryText} />
             </TouchableOpacity>
           </View>
         )}
@@ -446,22 +532,28 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
         {/* Deal panel */}
         {listingStatus === 'RESERVED' && acceptedOffer && (
           <View style={styles.deal}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-              <Icon name="handshake-outline" size={22} color={colors.success} />
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+              <View style={styles.dealIcon}><Icon name="handshake-outline" size={20} color="#FFFFFF" /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.dealTitle}>Deal agreed for {formatPrice(acceptedOffer.amount)}!</Text>
-                <Text style={styles.dealBody}>
-                  {iAmSeller
-                    ? `Reserved for ${acceptedOffer.buyer.displayName}. Arrange a meet-up here, then mark it as sold once you've been paid.`
-                    : 'Reserved for you. Agree a time and a safe public place to meet, check the item, then pay on handover.'}
-                </Text>
+                {savedAmount > 0 && (
+                  <Text style={styles.dealSaved}>{iAmSeller ? `${formatPrice(savedAmount)} below your listed price` : `You saved ${formatPrice(savedAmount)} from the listed price`}</Text>
+                )}
               </View>
-              <View style={styles.reservedPill}><Text style={styles.reservedText}>RESERVED</Text></View>
+              <View style={styles.reservedPill}>
+                <Icon name="lock" size={11} color="#FFFFFF" />
+                <Text style={styles.reservedText}>RESERVED</Text>
+              </View>
             </View>
+            <Text style={styles.dealBody}>
+              {iAmSeller
+                ? `Reserved for ${acceptedOffer.buyer.displayName}. Meet in person, let them check the item, then confirm the sale.`
+                : 'Both of you agreed on the price. Meet in a safe public place to check the item and complete the purchase.'}
+            </Text>
             {iAmSeller && (
               <View style={styles.dealActions}>
                 <Button title="Mark as sold" icon="check-circle-outline" variant="strong" size="sm" disabled={busy} onPress={() => handleDealAction('mark-sold')} style={{ flex: 1 }} />
-                <Button title="Cancel reservation" variant="outline" size="sm" disabled={busy} onPress={() => handleDealAction('mark-available')} style={{ flex: 1 }} />
+                <Button title="Cancel deal" icon="close" variant="outline" size="sm" disabled={busy} onPress={() => handleDealAction('mark-available')} style={{ flex: 1 }} />
               </View>
             )}
           </View>
@@ -482,8 +574,14 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
         {/* Messages */}
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={rows}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            <View style={styles.systemPill}>
+              <Icon name="shield-outline" size={14} color={colors.primaryText} />
+              <Text style={styles.systemText}>Keep chats and offers inside Becho</Text>
+            </View>
+          }
           contentContainerStyle={{ padding: 16, flexGrow: 1 }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           renderItem={renderMessage}
@@ -491,18 +589,30 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
         />
 
         {/* Quick actions */}
-        {(canMakeOffer || awaitingMyReply) && (
+        {(canMakeOffer || theirPending || offers.length > 0) && (
           <View style={styles.quick}>
+            {theirPending && (
+              <TouchableOpacity style={styles.quickChip} onPress={() => handleOpenCounter(theirPending)} accessibilityRole="button">
+                <Icon name="trending-up" size={15} color={colors.primaryText} />
+                <Text style={styles.quickText}>Make counter-offer</Text>
+              </TouchableOpacity>
+            )}
+            {theirPending && (
+              <TouchableOpacity style={styles.quickChip} onPress={() => confirmOfferAction(theirPending, 'accept')} accessibilityRole="button">
+                <Icon name="handshake-outline" size={15} color={colors.primaryText} />
+                <Text style={styles.quickText}>Accept {formatPrice(theirPending.amount)}</Text>
+              </TouchableOpacity>
+            )}
             {canMakeOffer && (
               <TouchableOpacity style={styles.quickChip} onPress={openNewOffer} accessibilityRole="button">
                 <Icon name="tag-outline" size={15} color={colors.primaryText} />
                 <Text style={styles.quickText}>Make an offer</Text>
               </TouchableOpacity>
             )}
-            {awaitingMyReply && (
+            {!theirPending && offers.length > 0 && (
               <TouchableOpacity style={styles.quickChip} onPress={() => setShowOffersModal(true)} accessibilityRole="button">
-                <Icon name="swap-horizontal" size={15} color={colors.primaryText} />
-                <Text style={styles.quickText}>Respond to offer</Text>
+                <Icon name="format-list-bulleted" size={15} color={colors.primaryText} />
+                <Text style={styles.quickText}>View offers</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -523,7 +633,7 @@ export const ChatDetailScreen: React.FC<{ route: any; navigation: any }> = ({ ro
             accessibilityLabel="Message"
           />
           <TouchableOpacity style={[styles.sendBtn, !input.trim() && { opacity: 0.5 }]} onPress={handleSend} disabled={!input.trim()} accessibilityRole="button" accessibilityLabel="Send">
-            <Icon name="send" size={20} color={colors.onPrimary} />
+            <Icon name="send-outline" size={20} color={colors.onPrimary} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -541,29 +651,44 @@ const makeStyles = (c: Colors) =>
     offersBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 32, borderRadius: 8, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface2, marginRight: 4 },
     offersBadgeAlert: { borderColor: c.warningSoftBorder, backgroundColor: c.warningSoft },
     offersBadgeText: { color: c.text, fontSize: 12, fontFamily: font.semibold },
-    strip: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 8, padding: 8, borderRadius: 10, backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border },
-    stripThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: c.surface },
-    stripTitle: { fontFamily: font.semibold, fontSize: 14, color: c.text },
-    stripPrice: { fontFamily: font.headingX, fontSize: 16, color: c.text },
-    viewAd: { fontFamily: font.semibold, fontSize: 13, color: c.primaryText, paddingHorizontal: 4 },
-    deal: { margin: 12, marginBottom: 0, padding: 14, borderRadius: 12, backgroundColor: c.successSoft, borderWidth: 1, borderColor: c.successSoftBorder },
-    dealTitle: { fontFamily: font.heading, fontSize: 17, color: c.text },
-    dealBody: { fontFamily: font.regular, fontSize: 13, lineHeight: 18, color: c.textSecondary, marginTop: 2 },
-    reservedPill: { backgroundColor: c.successFill, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+    strip: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginTop: 4, marginBottom: 4, padding: 10, borderRadius: 14, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
+    stripThumb: { width: 56, height: 56, borderRadius: 10, backgroundColor: c.surface2 },
+    stripTitle: { fontFamily: font.heading, fontSize: 15, color: c.text },
+    stripPrice: { fontFamily: font.headingX, fontSize: 17, color: c.primaryText },
+    stripListed: { fontFamily: font.regular, fontSize: 12, color: c.textMuted },
+    stripSeller: { fontFamily: font.regular, fontSize: 12, color: c.textMuted, marginTop: 1 },
+    viewAd: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 32, borderRadius: 8, backgroundColor: c.primarySoft },
+    viewAdText: { fontFamily: font.semibold, fontSize: 13, color: c.primaryText },
+    deal: { marginHorizontal: 12, marginTop: 8, padding: 14, borderRadius: 14, backgroundColor: c.successSoft, borderWidth: 1, borderColor: c.successSoftBorder },
+    dealIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.successFill, alignItems: 'center', justifyContent: 'center' },
+    dealTitle: { fontFamily: font.heading, fontSize: 16, color: c.text },
+    dealSaved: { fontFamily: font.medium, fontSize: 12, color: c.success, marginTop: 2 },
+    dealBody: { fontFamily: font.regular, fontSize: 13, lineHeight: 19, color: c.textSecondary, marginTop: 8 },
+    reservedPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: c.successFill, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
     reservedText: { color: '#FFFFFF', fontFamily: font.bold, fontSize: 10, letterSpacing: 0.5 },
     dealActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
     infoBar: { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, marginBottom: 0, padding: 12, borderRadius: 10, backgroundColor: c.surface2 },
     infoText: { flex: 1, fontFamily: font.regular, fontSize: 13, color: c.textSecondary },
     emptyChat: { fontFamily: font.regular, fontSize: 13, color: c.textMuted, textAlign: 'center', marginTop: 24, paddingHorizontal: 24 },
-    eventWrap: { alignItems: 'center', marginVertical: 8 },
-    eventCard: { width: '88%', flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
-    eventDeal: { width: '100%', backgroundColor: c.successSoft, borderColor: c.successSoftBorder },
-    eventIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' },
-    eventLabel: { fontFamily: font.regular, fontSize: 13, color: c.textMuted },
-    eventAmount: { fontFamily: font.headingX, fontSize: 18, color: c.text, marginTop: 1 },
-    eventSub: { fontFamily: font.regular, fontSize: 12, color: c.textSecondary, marginTop: 2 },
+    systemPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: c.tint, marginBottom: 8 },
+    systemText: { fontFamily: font.medium, fontSize: 12, color: c.textSecondary },
+    dayWrap: { alignItems: 'center', marginVertical: 8 },
+    dayText: { fontFamily: font.bold, fontSize: 11, letterSpacing: 0.8, color: c.textMuted, backgroundColor: c.surface2, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+    eventWrap: { alignItems: 'center', marginVertical: 6 },
+    eventCard: { width: '88%', flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: c.tint },
+    eventIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    eventLabel: { fontFamily: font.medium, fontSize: 13, color: c.textSecondary },
+    eventAmount: { fontFamily: font.headingX, fontSize: 18, color: c.primaryText, marginTop: 1 },
     eventTime: { color: c.textMuted, fontSize: 11, marginTop: 4, fontFamily: font.regular },
+    dealEvent: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, backgroundColor: c.successFill },
+    dealEventIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+    dealEventTitle: { fontFamily: font.headingX, fontSize: 18, color: '#FFFFFF' },
+    dealEventSub: { fontFamily: font.regular, fontSize: 12, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
     respond: { color: c.primaryText, fontFamily: font.bold },
+    suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+    suggest: { paddingHorizontal: 12, height: 34, borderRadius: 999, justifyContent: 'center', backgroundColor: c.tint },
+    suggestOn: { backgroundColor: c.primary },
+    suggestText: { fontFamily: font.semibold, fontSize: 13, color: c.text },
     msgWrapper: { marginBottom: 12, maxWidth: '80%' },
     msgLeft: { alignSelf: 'flex-start' },
     msgRight: { alignSelf: 'flex-end' },
@@ -573,13 +698,13 @@ const makeStyles = (c: Colors) =>
     msgText: { color: c.text, fontSize: 15, lineHeight: 21, fontFamily: font.regular },
     msgTextMe: { color: c.onPrimary, fontSize: 15, lineHeight: 21, fontFamily: font.regular },
     timeText: { color: c.textMuted, fontSize: 11, marginTop: 4, fontFamily: font.regular },
-    quick: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingTop: 8, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border },
-    quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 32, borderRadius: 999, backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.primarySoftBorder },
+    quick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingTop: 8, backgroundColor: c.surface, borderTopWidth: 1, borderTopColor: c.border },
+    quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 32, borderRadius: 999, backgroundColor: c.tint, borderWidth: 1, borderColor: c.primarySoftBorder },
     quickText: { fontFamily: font.semibold, fontSize: 13, color: c.primaryText },
     composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 10, backgroundColor: c.surface },
-    plus: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' },
-    textInput: { flex: 1, minHeight: 42, maxHeight: 110, backgroundColor: c.surface2, color: c.text, borderRadius: 21, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, fontSize: 15, fontFamily: font.regular, borderWidth: 1, borderColor: c.border },
-    sendBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: c.primary, justifyContent: 'center', alignItems: 'center' },
+    plus: { width: 42, height: 42, borderRadius: 12, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' },
+    textInput: { flex: 1, minHeight: 42, maxHeight: 110, backgroundColor: c.surface2, color: c.text, borderRadius: 12, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, fontSize: 15, fontFamily: font.regular, borderWidth: 1, borderColor: c.border },
+    sendBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: c.primary, justifyContent: 'center', alignItems: 'center' },
     modalSub: { fontFamily: font.regular, color: c.textSecondary, fontSize: 14, marginBottom: 16 },
     emptyOffers: { color: c.textSecondary, textAlign: 'center', padding: 20, fontFamily: font.regular },
     inputLabel: { fontFamily: font.semibold, color: c.text, fontSize: 13, marginBottom: 6 },

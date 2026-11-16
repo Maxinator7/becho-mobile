@@ -17,9 +17,11 @@ import { NotificationsProvider } from './src/context/NotificationsContext';
 import { FavoritesProvider } from './src/context/FavoritesContext';
 import { CityProvider } from './src/context/CityContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { installWebAlert } from './src/utils/webAlert';
 
 // Keep the native splash screen up until the fonts are ready.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+installWebAlert();
 
 const ThemedStatusBar = () => {
   const { scheme } = useTheme();

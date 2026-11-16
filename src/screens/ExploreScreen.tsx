@@ -73,7 +73,8 @@ export const ExploreScreen: React.FC<{ navigation: any; route: any }> = ({ navig
   // Params from Home (search box, category tile, filter button, "show verified").
   useEffect(() => {
     const p = route.params;
-    if (!p) return;
+    // Params are cleared below once applied; stop here when there is nothing new, or this loops.
+    if (!p || (p.search === undefined && p.categoryId === undefined && !p.verified && !p.openFilters)) return;
     if (p.search !== undefined) {
       setQuery(p.search);
       setSearch(p.search);

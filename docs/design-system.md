@@ -9,6 +9,8 @@ Reference renders (HTML + PNG) live outside the repo; see the screen map below.
 - Verification we *do* have: email verified, mobile number on file (SMS verification coming), staff-verified listing badge, phone-verified account status.
 
 ## Colour tokens — marketplace & mobile
+> **Mobile, second pass (Stitch refresh, 16 Nov 2026):** the light theme moved to the refreshed Stitch palette — lavender page `#FAF8FF`, deep indigo `primary #3730A3` / `primary-text #2A1F9E`, `primary-soft #E2DFFF`, tint `#EAEDFF` (icon wells, spec tiles, filled inputs `#F2F3FF`), and a purple **accent** `#8127CF` (reserved deals, "Confirm sale", badges, "B" logo mark). Dark keeps the values below plus accent `#9333EA` / accent-text `#D8B4FE`. Source of truth: `src/theme/ThemeContext.tsx`. Fonts stay Inter + Plus Jakarta Sans (Stitch now uses Manrope/Epilogue; not adopted).
+
 | Token | Light | Dark | Use |
 |---|---|---|---|
 | bg | `#F8FAFC` (slate-50) | `#0B0F19` | page background |

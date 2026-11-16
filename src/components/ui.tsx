@@ -78,7 +78,7 @@ const chipStyles = StyleSheet.create({
   upper: { fontSize: 10, letterSpacing: 0.6 },
 });
 
-type ButtonVariant = 'primary' | 'outline' | 'strong' | 'soft' | 'danger' | 'ghost';
+type ButtonVariant = 'primary' | 'outline' | 'strong' | 'soft' | 'danger' | 'ghost' | 'accent';
 
 export const Button: React.FC<{
   title: string;
@@ -96,10 +96,11 @@ export const Button: React.FC<{
   const palette: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
     primary: { bg: colors.primary, fg: colors.onPrimary, border: colors.primary },
     strong: { bg: colors.strongButton, fg: '#FFFFFF', border: colors.strongButton },
-    outline: { bg: colors.surface, fg: colors.text, border: colors.borderStrong },
+    outline: { bg: colors.surface, fg: colors.primaryText, border: colors.primarySoftBorder },
     soft: { bg: colors.primarySoft, fg: colors.primaryText, border: colors.primarySoft },
     danger: { bg: colors.danger, fg: '#FFFFFF', border: colors.danger },
     ghost: { bg: 'transparent', fg: colors.primaryText, border: 'transparent' },
+    accent: { bg: colors.accent, fg: '#FFFFFF', border: colors.accent },
   };
   const p = palette[variant];
   const small = size === 'sm';
