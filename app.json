@@ -11,7 +11,8 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/cabb9d11-eb4f-476a-aead-ea27b4c27719"
     },
     "ios": {
       "bundleIdentifier": "in.becho.app",
@@ -33,6 +34,12 @@
       "expo-font",
       "expo-splash-screen",
       "expo-web-browser"
-    ]
+    ],
+    "owner": "maxinator",
+    "extra": {
+      "eas": {
+        "projectId": "cabb9d11-eb4f-476a-aead-ea27b4c27719"
+      }
+    }
   }
 }
