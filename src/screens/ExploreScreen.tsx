@@ -18,6 +18,7 @@ import { fetchApi } from '../api/client';
 import { ListingCard, ListingSummary } from '../components/ListingCard';
 import { LocationModal } from '../components/LocationModal';
 import { Button, EmptyState, Icon, IconButton, sheetStyles } from '../components/ui';
+import { FeedbackButton } from '../components/FeedbackButton';
 import { useCity } from '../context/CityContext';
 import { useCategories } from '../utils/catalog';
 import { CONDITIONS } from '../utils/listing';
@@ -155,6 +156,7 @@ export const ExploreScreen: React.FC<{ navigation: any; route: any }> = ({ navig
           <Text style={styles.cityText}>{area?.cityName ?? 'All cities'}</Text>
           <Icon name="chevron-down" size={16} color={colors.textMuted} />
         </TouchableOpacity>
+        <FeedbackButton style={{ marginLeft: 4, marginRight: -8 }} />
       </View>
       <View style={styles.searchRow}>
         <View style={styles.search}>
@@ -315,8 +317,8 @@ const makeStyles = (c: Colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.bg },
     headerWrap: { paddingHorizontal: PAD, paddingTop: 8, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border },
-    titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-    title: { fontFamily: font.heading, fontSize: 24, color: c.text },
+    titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    title: { flex: 1, fontFamily: font.heading, fontSize: 24, color: c.text },
     cityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 34, borderRadius: 999, backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border },
     cityText: { fontFamily: font.semibold, fontSize: 13, color: c.text },
     searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

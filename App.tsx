@@ -16,6 +16,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { NotificationsProvider } from './src/context/NotificationsContext';
 import { FavoritesProvider } from './src/context/FavoritesContext';
 import { CityProvider } from './src/context/CityContext';
+import { BetaProvider } from './src/context/BetaContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { installWebAlert } from './src/utils/webAlert';
 
@@ -59,8 +60,10 @@ export default function App() {
             <NotificationsProvider>
               <FavoritesProvider>
                 <CityProvider>
-                  <ThemedStatusBar />
-                  <AppNavigator />
+                  <BetaProvider>
+                    <ThemedStatusBar />
+                    <AppNavigator />
+                  </BetaProvider>
                 </CityProvider>
               </FavoritesProvider>
             </NotificationsProvider>

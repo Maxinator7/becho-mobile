@@ -6,6 +6,7 @@ import { fetchApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationsContext';
 import { Avatar, Button, EmptyState, Icon } from '../components/ui';
+import { FeedbackButton } from '../components/FeedbackButton';
 import { formatPrice, timeAgo } from '../utils/format';
 import { Colors, font, useTheme, useThemedStyles } from '../theme/ThemeContext';
 
@@ -49,9 +50,12 @@ export const ConversationsScreen: React.FC<{ navigation: any }> = ({ navigation 
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title} accessibilityRole="header">Chats</Text>
-        <Text style={styles.sub}>Messages and offers with buyers and sellers</Text>
+      <View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title} accessibilityRole="header">Chats</Text>
+          <Text style={styles.sub}>Messages and offers with buyers and sellers</Text>
+        </View>
+        <FeedbackButton style={{ marginRight: -8 }} />
       </View>
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />

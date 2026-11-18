@@ -7,6 +7,8 @@ import { useCity } from '../context/CityContext';
 import { NotificationBell } from './NotificationBell';
 import { LocationModal } from './LocationModal';
 import { Icon } from './ui';
+import { FeedbackButton } from './FeedbackButton';
+import { useBeta } from '../context/BetaContext';
 
 /** Becho logo mark + wordmark. */
 export const Logo: React.FC = () => {
@@ -41,7 +43,11 @@ export const AuthHeader: React.FC<{ title: string; onBack?: () => void }> = ({ t
   );
 };
 
-/** Main top bar: logo · city pill · bell · avatar (or Sign in). */
+/**
+ * Main top bar: logo · city pill · bell · avatar (or Sign in).
+ * The beta banner below it carries the Feedback action; once the banner is closed a feedback button
+ * takes its place here so feedback stays one tap away.
+ */
 export const TopBar: React.FC = () => {
   const styles = useThemedStyles(makeStyles);
   const { colors } = useTheme();
@@ -49,6 +55,7 @@ export const TopBar: React.FC = () => {
   const { user } = useAuth();
   const { area, setArea } = useCity();
   const [picker, setPicker] = useState(false);
+  const { bannerDismissed } = useBeta();
 
   return (
     <View style={styles.bar}>
@@ -59,6 +66,7 @@ export const TopBar: React.FC = () => {
         <Icon name="chevron-down" size={16} color={colors.textMuted} />
       </TouchableOpacity>
       <View style={styles.right}>
+        {bannerDismissed && <FeedbackButton />}
         {user ? (
           <>
             <NotificationBell onPress={() => navigation.navigate('Notifications')} />

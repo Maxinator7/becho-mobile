@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchApi } from '../api/client';
 import { TopBar } from '../components/TopBar';
+import { BetaBanner } from '../components/BetaBanner';
 import { ListingCard, ListingSummary } from '../components/ListingCard';
 import { Button, EmptyState, Icon, SectionTitle } from '../components/ui';
 import { useCity } from '../context/CityContext';
@@ -64,6 +65,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopBar />
+      <BetaBanner />
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"

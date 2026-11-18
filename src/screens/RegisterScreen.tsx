@@ -8,6 +8,7 @@ import { fieldErrors, passwordRules, validate } from '../utils/validation';
 import { Colors, font, useTheme, useThemedStyles } from '../theme/ThemeContext';
 import { AuthHeader } from '../components/TopBar';
 import { Button, Icon } from '../components/ui';
+import { openPrivacy } from '../utils/beta';
 
 interface RegisterResult {
   tokens: AuthTokens;
@@ -40,7 +41,7 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       email: validate.email(form.email),
       password: validate.password(form.password),
       confirm: form.confirm === form.password ? null : 'Passwords do not match',
-      terms: agreed ? null : 'Please accept the terms to continue',
+      terms: agreed ? null : 'Please accept the beta terms and privacy notice to continue',
     };
     setErrors(next);
     return Object.values(next).every((v) => !v);
@@ -117,7 +118,17 @@ export const RegisterScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               {agreed && <Icon name="check" size={16} color={colors.onPrimary} />}
             </View>
             <Text style={styles.termsText}>
-              I agree to Becho's <Text style={styles.termsStrong}>Terms of Service</Text> & <Text style={styles.termsStrong}>Privacy Policy</Text>, and to receive emails about my account, offers and chats.
+              I agree to the{' '}
+              <Text
+                style={styles.termsStrong}
+                accessibilityRole="link"
+                onPress={(e) => {
+                  e?.stopPropagation?.();
+                  void openPrivacy();
+                }}
+              >
+                Becho beta terms and privacy notice
+              </Text>
             </Text>
           </TouchableOpacity>
           {errors.terms ? <Text style={styles.termsError}>{errors.terms}</Text> : null}
@@ -167,7 +178,7 @@ const makeStyles = (c: Colors) => StyleSheet.create({
   checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: c.borderStrong, alignItems: 'center', justifyContent: 'center' },
   checkboxOn: { backgroundColor: c.primary, borderColor: c.primary },
   termsText: { flex: 1, fontFamily: font.regular, fontSize: 13, lineHeight: 19, color: c.textSecondary },
-  termsStrong: { fontFamily: font.semibold, color: c.primaryText },
+  termsStrong: { fontFamily: font.semibold, color: c.primaryText, textDecorationLine: 'underline' },
   termsError: { fontFamily: font.medium, fontSize: 12, color: c.danger, marginTop: 6 },
   center: { alignItems: 'center', marginTop: 14 },
   linkText: { color: c.primaryText, fontSize: 14, fontFamily: font.semibold },

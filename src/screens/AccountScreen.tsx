@@ -24,6 +24,9 @@ import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useNotifications } from '../context/NotificationsContext';
 import { TopBar } from '../components/TopBar';
+import { BetaBanner } from '../components/BetaBanner';
+import { useBeta } from '../context/BetaContext';
+import { openPrivacy } from '../utils/beta';
 import { FormField } from '../components/FormField';
 import { Button, Chip, EmptyState, Icon, IconButton, IconName, Notice, sheetStyles } from '../components/ui';
 import { formatPrice } from '../utils/format';
@@ -93,6 +96,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const { user, logout, refreshUser, setUser } = useAuth();
   const { ids: favoriteIds, refresh: refreshFavorites } = useFavorites();
   const { unreadCount } = useNotifications();
+  const { openFeedback } = useBeta();
   const { colors, preference, cyclePreference } = useTheme();
   const styles = useThemedStyles(makeStyles);
   const sheet = useThemedStyles(sheetStyles);
@@ -137,6 +141,7 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <TopBar />
+        <BetaBanner />
         <EmptyState icon="account-outline" title="Sign in to see your account" action={<Button title="Sign in" onPress={() => navigation.navigate('Login')} />} />
       </SafeAreaView>
     );
@@ -221,11 +226,15 @@ export const AccountScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
     { icon: 'cellphone', label: 'Add mobile number', onPress: () => setPhoneSheet(true), hidden: !!user.phone },
     { icon: 'bell-outline', label: 'Notifications', badge: unreadCount ? `${unreadCount} new` : undefined, onPress: () => navigation.navigate('Notifications') },
     { icon: 'shield-outline', label: 'Help & safety tips', onPress: () => Alert.alert('Trade safely on Becho', SAFETY_TIPS) },
+    { icon: 'message-draw', label: 'Send feedback', badge: 'Beta', onPress: () => openFeedback() },
+    { icon: 'file-document-outline', label: 'Terms & privacy', onPress: () => void openPrivacy() },
+    { icon: 'account-remove-outline', label: 'Request account deletion', onPress: () => openFeedback({ category: 'OTHER', message: 'Delete my account' }) },
   ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopBar />
+      <BetaBanner />
       <Modal visible={phoneSheet} transparent animationType="slide" onRequestClose={() => setPhoneSheet(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={sheet.overlay} onPress={() => setPhoneSheet(false)}>

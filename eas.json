@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://becho-api.onrender.com/api/v1",
+        "EXPO_PUBLIC_WEB_URL": "https://becho-web.gautamwarmachine68.workers.dev"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://becho-api.onrender.com/api/v1",
+        "EXPO_PUBLIC_WEB_URL": "https://becho-web.gautamwarmachine68.workers.dev"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

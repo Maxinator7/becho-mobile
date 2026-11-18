@@ -22,6 +22,7 @@ import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { SavedAdsScreen } from '../screens/SavedAdsScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { VerifyEmailScreen } from '../screens/VerifyEmailScreen';
+import { navigationRef } from './navigationRef';
 
 export type TabParamList = {
   Home: undefined;
@@ -140,7 +141,7 @@ export const AppNavigator: React.FC = () => {
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const navTheme = { ...base, colors: { ...base.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.primary } };
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs" component={Tabs} />
         <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
